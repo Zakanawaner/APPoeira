@@ -1,0 +1,389 @@
+CREATE TABLE groups (
+group_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+group_name TEXT,
+group_picture_url TEXT,
+group_url TEXT,
+group_phone TEXT,
+group_verified BOOL,
+group_opening_hours TEXT,
+group_facebook_id TEXT,
+group_google_id TEXT,
+group_description TEXT,
+group_address TEXT,
+group_location TEXT,  # TODO Eliminar
+group_city_id INTEGER,
+group_country_id INTEGER,
+group_owner_id INTEGER,  # TODO Eliminar
+group_school_id INTEGER,
+group_latitude REAL,
+group_longitude REAL,
+FOREIGN KEY (group_city_id) REFERENCES cities (city_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (group_country_id) REFERENCES countries (country_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (group_owner_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (group_school_id) REFERENCES schools (school_id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+---------
+CREATE TABLE users (
+user_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+user_first_name TEXT,
+user_last_name TEXT,
+user_apelhido TEXT,
+user_pic_url TEXT,
+user_email TEXT,
+user_password TEXT,
+user_date_join TIMESTAMP,
+user_premium BOOL,
+user_rank_id INTEGER,
+user_school_id INTEGER,
+FOREIGN KEY (user_rank_id) REFERENCES ranks (rank_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (user_school_id) REFERENCES schools (school_id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+CREATE TABLE rodas (
+roda_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+roda_name TEXT,
+roda_date TIMESTAMP,
+roda_pic_url TEXT,
+roda_facebook_id TEXT,
+roda_google_id TEXT,
+roda_description TEXT,
+roda_verified BOOL,
+roda_latitude REAL,
+roda_longitude REAL,
+roda_city_id INTEGER,
+roda_country_id INTEGER,
+roda_group_id INTEGER,
+FOREIGN KEY (roda_city_id) REFERENCES cities (city_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (roda_country_id) REFERENCES countries (country_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (roda_group_id) REFERENCES groups (group_id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+CREATE TABLE events (
+event_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+event_name TEXT,
+event_date TIMESTAMP,
+event_pic_url TEXT,
+event_facebook_id TEXT,
+event_google_id TEXT,
+event_description TEXT,
+event_verified BOOL,
+event_latitude REAL,
+event_longitude REAL,
+event_city_id INTEGER,
+event_country_id INTEGER,
+event_group_id INTEGER,
+FOREIGN KEY (event_city_id) REFERENCES cities (city_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (event_country_id) REFERENCES countries (country_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (event_group_id) REFERENCES groups (group_id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+CREATE TABLE onlines (
+online_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+online_name TEXT,
+online_date TIMESTAMP,
+online_pic_url TEXT,
+online_facebook_id TEXT,
+online_google_id TEXT,
+online_description TEXT,
+online_verified BOOL,
+online_group_id INTEGER,
+FOREIGN KEY (online_group_id) REFERENCES groups (group_id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+CREATE TABLE cities (
+city_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+city_name TEXT
+);
+
+CREATE TABLE schools (
+school_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+school_name TEXT
+);
+
+CREATE TABLE countries (
+country_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+country_name TEXT
+);
+
+CREATE TABLE platforms (
+platform_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+platform_name TEXT
+);
+
+CREATE TABLE ranks (
+rank_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+rank_name TEXT
+);
+
+CREATE TABLE grouproles (
+group_role_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+group_role_name TEXT
+);
+
+CREATE TABLE eventroles (
+event_role_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+event_role_name TEXT
+);
+
+CREATE TABLE rodaroles (
+roda_role_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+roda_role_name TEXT
+);
+
+CREATE TABLE onlineroles (
+online_role_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+online_role_name TEXT
+);
+
+############
+MANY TO MANY
+############
+
+CREATE TABLE user_group (
+u_g_user_id INTEGER,
+u_g_group_id INTEGER,
+u_g_role_id INTEGER,
+FOREIGN KEY (u_g_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (u_g_group_id) REFERENCES groups (group_id) ON UPDATE CASCADE ON DELETE CASCADE,
+FOREIGN KEY (u_g_role_id) REFERENCES grouproles (group_role_id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+CREATE TABLE user_roda (
+u_r_user_id INTEGER,
+u_r_roda_id INTEGER,
+u_r_role_id INTEGER,
+FOREIGN KEY (u_r_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (u_r_roda_id) REFERENCES rodas (roda_id) ON UPDATE CASCADE ON DELETE CASCADE,
+FOREIGN KEY (u_r_role_id) REFERENCES rodaroles (roda_role_id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+CREATE TABLE user_event (
+u_e_user_id INTEGER,
+u_e_event_id INTEGER,
+u_e_role_id INTEGER,
+FOREIGN KEY (u_e_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (u_e_event_id) REFERENCES events (event_id) ON UPDATE CASCADE ON DELETE CASCADE,
+FOREIGN KEY (u_e_role_id) REFERENCES event_roles (event_id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+CREATE TABLE user_online (
+u_o_user_id INTEGER,
+u_o_online_id INTEGER,
+u_o_role_id INTEGER,
+FOREIGN KEY (u_o_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (u_o_online_id) REFERENCES onlines (online_id) ON UPDATE CASCADE ON DELETE CASCADE,
+FOREIGN KEY (u_o_role_id) REFERENCES onlineroles (online_role_id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+CREATE TABLE user_rating_group (
+u_r_g_user_id INTEGER,
+u_r_g_group_id INTEGER,
+u_r_g_rating INTEGER,
+FOREIGN KEY (u_r_g_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (u_r_g_group_id) REFERENCES groups (group_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE user_rating_roda (
+u_r_r_user_id INTEGER,
+u_r_r_roda_id INTEGER,
+u_r_r_rating INTEGER,
+FOREIGN KEY (u_r_r_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (u_r_r_roda_id) REFERENCES rodas (roda_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE user_rating_event (
+u_r_e_user_id INTEGER,
+u_r_e_event_id INTEGER,
+u_r_e_rating INTEGER,
+FOREIGN KEY (u_r_e_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (u_r_e_event_id) REFERENCES events (event_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE user_rating_online (
+u_r_o_user_id INTEGER,
+u_r_o_online_id INTEGER,
+u_r_o_rating INTEGER,
+FOREIGN KEY (u_r_o_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (u_r_o_online_id) REFERENCES onlines (online_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE user_rating_group (
+u_r_g_user_id INTEGER,
+u_r_g_group_id INTEGER,
+u_r_g_rating INTEGER,
+FOREIGN KEY (u_r_g_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE SET NULL,
+FOREIGN KEY (u_r_g_group_id) REFERENCES groups (group_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE event_platform (
+e_p_event_id INTEGER,
+e_p_platform_id INTEGER,
+e_p_key TEXT,
+FOREIGN KEY (e_p_event_id) REFERENCES events (event_id) ON UPDATE CASCADE ON DELETE CASCADE,
+FOREIGN KEY (e_p_platform_id) REFERENCES platforms (platform_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE online_platform (
+o_p_online_id INTEGER,
+o_p_platform_id INTEGER,
+o_p_key TEXT,
+FOREIGN KEY (e_p_online_id) REFERENCES onlines (online_id) ON UPDATE CASCADE ON DELETE CASCADE,
+FOREIGN KEY (e_p_platform_id) REFERENCES platforms (platform_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE user_comment_group (
+u_c_g_user_id INTEGER,
+u_c_g_group_id INTEGER,
+u_c_g_comment TEXT,
+FOREIGN KEY (u_c_g_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE CASCADE,
+FOREIGN KEY (u_c_g_group_id) REFERENCES groups (group_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE user_comment_roda (
+u_c_r_user_id INTEGER,
+u_c_r_roda_id INTEGER,
+u_c_r_comment TEXT,
+FOREIGN KEY (u_c_r_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE CASCADE,
+FOREIGN KEY (u_c_r_roda_id) REFERENCES rodas (roda_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE user_comment_event (
+u_c_e_user_id INTEGER,
+u_c_e_event_id INTEGER,
+u_c_e_comment TEXT,
+FOREIGN KEY (u_c_e_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE CASCADE,
+FOREIGN KEY (u_c_e_event_id) REFERENCES events (event_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE user_comment_online (
+u_c_o_user_id INTEGER,
+u_c_o_online_id INTEGER,
+u_c_o_comment TEXT,
+FOREIGN KEY (u_c_o_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE CASCADE,
+FOREIGN KEY (u_c_o_online_id) REFERENCES onlines (online_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE user_follows_user (
+u_f_u_user_id INTEGER,
+u_f_u_followed_id INTEGER,
+FOREIGN KEY (u_f_u_user_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE CASCADE,
+FOREIGN KEY (u_f_u_followed_id) REFERENCES users (user_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+###################
+QUERY MANY TO MANY
+###################
+
+SELECT groups.group_name, grouproles.group_role_name, users.user_apelhido
+FROM groups JOIN grouproles JOIN users
+ON user_group.u_g_group_id = groups.group_id AND
+user_group.u_g_user_id = users.user_id AND
+user_group.u_g_role_id = grouproles.group_role_name;
+
+SELECT user_first_name,
+user_last_name,
+user_apelhido,
+user_pic_url,
+user_email,
+user_date_join,
+user_premium,
+rank_name,
+school_name
+FROM users JOIN ranks JOIN schools
+ON rank_id = user_rank_id
+AND school_id = user_school_id
+WHERE user_email = "mario.fernandez.gtd@gmail.com";
+
+SELECT school_name,
+user_id,
+user_apelhido,
+user_pic_url,
+user_premium,
+rank_name,
+group_role_name
+FROM schools JOIN users JOIN ranks JOIN grouproles JOIN user_group JOIN groups
+ON group_school_id = school_id AND
+user_rank_id = rank_id AND
+u_g_user_id = user_id AND
+u_g_role_id = group_role_id
+WHERE u_g_group_id = 1555 AND
+group_id = 1555;
+
+
+
+####Para pedirlo cuando entras en el perfil.... a estudiar
+
+SELECT user_id,
+user_first_name,
+user_last_name,
+user_apelhido,
+user_pic_url,
+user_email,
+user_date_join,
+user_premium,
+rank_name,
+school_name
+FROM users
+INNER JOIN ranks
+ON rank_id = user_rank_id
+INNER JOIN schools
+ON school_id = user_school_id
+WHERE user_id = 14;
+
+SELECT group_id,
+group_role_name
+FROM groups
+INNER JOIN user_group ON group_id = u_g_group_id
+INNER JOIN users ON u_g_user_id = user_id
+INNER JOIN grouproles ON u_g_role_id = group_role_id
+WHERE user_id = 14;
+
+SELECT event_id,
+event_role_name
+FROM events
+INNER JOIN user_event ON event_id = u_e_event_id
+INNER JOIN users ON u_e_user_id = user_id
+INNER JOIN eventroles ON u_e_role_id = event_role_id
+WHERE user_id = 14;
+
+SELECT roda_id,
+roda_role_name
+FROM rodas
+INNER JOIN user_roda ON roda_id = u_r_roda_id
+INNER JOIN users ON u_r_user_id = user_id
+INNER JOIN rodaroles ON u_r_role_id = roda_role_id
+WHERE user_id = 14;
+
+SELECT online_id,
+online_role_name
+FROM onlines
+INNER JOIN user_online ON online_id = u_o_online_id
+INNER JOIN users ON u_o_user_id = user_id
+INNER JOIN onlineroles ON u_o_role_id = online_role_id
+WHERE user_id = 14;
+
+SELECT group_id
+FROM groups
+INNER JOIN user_rating_group ON group_id = u_r_g_group_id
+INNER JOIN users ON u_r_g_user_id = user_id
+WHERE user_id = 14;
+
+SELECT event_id
+FROM events
+INNER JOIN user_rating_event ON event_id = u_r_e_event_id
+INNER JOIN users ON u_r_e_user_id = user_id
+WHERE user_id = 14;
+
+SELECT roda_id
+FROM rodas
+INNER JOIN user_rating_roda ON roda_id = u_r_r_roda_id
+INNER JOIN users ON u_r_r_user_id = user_id
+WHERE user_id = 14;
+
+SELECT online_id
+FROM onlines
+INNER JOIN user_rating_online ON online_id = u_r_o_online_id
+INNER JOIN users ON u_r_o_user_id = user_id
+WHERE user_id = 14;
+
+
