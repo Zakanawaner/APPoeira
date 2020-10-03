@@ -7,6 +7,8 @@
 #       -> Añadir poder subir fotos de la librería o hacerlas en el momento                     INVESTIGAR
 #       -> Salir de grupos, rodas, etc                                                          PENSARLO
 #       -> Meter la clase de server en methods de server stuff                                  PUEDO
+#       -> Sanitizar inputs                                                                     INVESTIGAR
+#       -> Cuando aparece el teclado se lleva el bottombar                                      INVESTIGAR
 #  GroupListViewv
 #       -> Hacer que aparezca la imagen en la etiqueta del marcador                             INVESTIGAR
 #  GroupDetailView                                                                              OK
@@ -16,7 +18,6 @@
 #          alguna manera acredite a esa persona. Se le pedirá el teléfono y se enviará un mail con este teléfono a los
 #          demás instructores de la ciudad. Este mail habrá dos botones uno con el sí y el otro con el no que, o bien
 #          me llegará a mí, o bien se validará de forma automática. Informarle con un Popup     PENSARLO
-#       -> Hacer lo del rating en un fragmento como lo demás, y no en un Popup                  PUEDO
 #  GroupModificationView
 #       -> No implementada                                                                      PUEDO
 #       -> Sólo el creador podrá implementarla, o las personas a las que él habilite            PUEDO
@@ -24,13 +25,12 @@
 #       -> Invitar a gente (solo el dueño del grupo) y las invitacinoes tienen que aceptarse    PUEDO
 #  RodaListView
 #       -> Hacer que aparezca la imagen en la etiqueta del marcador                             INVESTIGAR
-#       -> hacer la parte del mapa                                                              PUEDO
 #  RodaDetailView                                                                               OK
 #  RodaDetailMoreView
 #       -> No implementada                                                                      PUEDO
 #       -> Hacer lo mismo que con los grupos                                                    PUEDO
 #  RodaModificationView
-#       -> Añadir un teléfono de contacto                                                       PUEDO
+#       -> La imagen por defecto no carga                                                       INVESTIGAR
 #  EventListView
 #       -> No implementada                                                                      PUEDO
 #       -> Añadir un botón de crear evento                                                      PUEDO
@@ -40,9 +40,8 @@
 #       -> No implementada                                                                      PUEDO
 #       -> Hacer lo mismo que con los grupos                                                    PUEDO
 #  EventModificationView
-#       -> No implementada                                                                      PUEDO
-#       -> Sólo el creador podrá implementarla, o las personas a las que él habilite            PUEDO
-#       -> Invitar a gente (solo el dueño del grupo) y las invitacinoes tienen que aceptarse    PUEDO
+#       -> La imagen por defecto no carga                                                       INVESTIGAR
+#       -> No guarda bien los convidados                                                        INVESTIGAR
 #  OnlineListView
 #       -> No implementada                                                                      PUEDO
 #       -> Añadir un botón de crear Online                                                      PUEDO
@@ -53,9 +52,7 @@
 #       -> No implementada                                                                      PUEDO
 #       -> Hacer lo mismo que con los grupos                                                    PUEDO
 #  OnlineModificationView
-#       -> No implementada                                                                      PUEDO
-#       -> Sólo el creador podrá implementarla, o las personas a las que él habilite            PUEDO
-#       -> Invitar a gente (solo el dueño del grupo) y las invitacinoes tienen que aceptarse    PUEDO
+#       -> La imagen por defecto no carga                                                       INVESTIGAR
 #  LoginView
 #       -> Añadir logo                                                                          ALBERTO
 #  SignUpView
@@ -116,6 +113,7 @@ mail = Mail(app)
 ##########
 
 # Groups #
+##########
 @app.route('/location-group', methods=["POST"])
 def location_group():
     groups = librarian.group_get_based_on_location(float(request.__getattr__('json')['latitude']),
@@ -180,6 +178,7 @@ def user_rated_group():
 
 
 # Rodas #
+#########
 @app.route('/location-roda', methods=["POST"])
 def location_roda():
     rodas = librarian.roda_get_based_on_location(float(request.__getattr__('json')['latitude']),
@@ -202,7 +201,6 @@ def roda_detail():
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
-
 # Token
 @app.route('/roda-create', methods=["POST"])
 def roda_create():
@@ -217,12 +215,16 @@ def roda_create():
                                  sailor.city_from_latlng(float(request.__getattr__('json')['latitude']),
                                                          float(request.__getattr__('json')['longitude'])),
                                  sailor.country_from_latlng(float(request.__getattr__('json')['latitude']),
-                                                            float(request.__getattr__('json')['longitude'])))
+                                                            float(request.__getattr__('json')['longitude'])),
+
+                                 request.__getattr__('json')['phone'])
     if roda is not None:
         return make_response(json.dumps(roda), 200)
     return make_response(json.dumps(roda), 200)
 
+
 # Events #
+#########
 @app.route('/event-detail', methods=["POST"])
 def event_detail():
     if interceptor.check_for_token(request.__getattr__('json'), librarian) == 1:
@@ -235,8 +237,50 @@ def event_detail():
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
+# Token
+@app.route('/event-create', methods=["POST"])
+def event_create():
+    event = librarian.event_create(request.__getattr__('json')['owners'],
+                                   request.__getattr__('json')['name'],
+                                   request.__getattr__('json')['description'],
+                                   request.__getattr__('json')['date'],
+                                   request.__getattr__('json')['picUrl'],
+                                   request.__getattr__('json')['invited'],
+                                   int(request.__getattr__('json')['platform']),
+                                   float(request.__getattr__('json')['latitude']),
+                                   float(request.__getattr__('json')['longitude']),
+                                   sailor.city_from_latlng(float(request.__getattr__('json')['latitude']),
+                                                           float(request.__getattr__('json')['longitude'])),
+                                   sailor.country_from_latlng(float(request.__getattr__('json')['latitude']),
+                                                              float(request.__getattr__('json')['longitude'])),
+                                   request.__getattr__('json')['phone'],
+                                   request.__getattr__('json')['convided'],
+                                   request.__getattr__('json')['key'])
+    if event is not None:
+        return make_response(json.dumps(event), 200)
+    return make_response(json.dumps(event), 200)
+
+# Onlines #
+###########
+# Token
+@app.route('/online-create', methods=["POST"])
+def online_create():
+    online = librarian.online_create(request.__getattr__('json')['owners'],
+                                     request.__getattr__('json')['name'],
+                                     request.__getattr__('json')['description'],
+                                     request.__getattr__('json')['date'],
+                                     request.__getattr__('json')['picUrl'],
+                                     request.__getattr__('json')['invited'],
+                                     int(request.__getattr__('json')['platform']),
+                                     request.__getattr__('json')['phone'],
+                                     request.__getattr__('json')['key'])
+    if online is not None:
+        return make_response(json.dumps(online), 200)
+    return make_response(json.dumps(online), 200)
+
 
 # Users #
+#########
 @app.route('/sign-up', methods=["POST"])
 def signup_user():
     user = librarian.user_signup(request.__getattr__('json')['firstName'],

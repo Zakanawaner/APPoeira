@@ -392,7 +392,7 @@ class DatabaseSQLite:
                  }]
 
     # APPoeira Function: Inserts a new Roda on the DB. Function called when /roda-created invoked
-    def roda_create(self, owners, name, description, date, pic_url, invited, latitude, longitude, city, country):
+    def roda_create(self, owners, name, description, date, pic_url, invited, latitude, longitude, city, country, phone):
         self.open_connection()
         self.cursor.execute("SELECT city_id FROM cities WHERE city_name = ?;", (city,))
         city_id = self.cursor.fetchone()
@@ -407,12 +407,13 @@ class DatabaseSQLite:
                                        "roda_latitude, "
                                        "roda_longitude, "
                                        "roda_city_id, "
-                                       "roda_country_id "
+                                       "roda_country_id, "
+                                       "roda_phone "
                                        ") "
-                                       "VALUES (?,?,?,?,?,?,?,?,?);",
+                                       "VALUES (?,?,?,?,?,?,?,?,?,?);",
                                        (name, date, pic_url if pic_url != "" else self.default_group_image,
                                         description, True, latitude, longitude, city_id[0],
-                                        country_id[0]))
+                                        country_id[0], phone))
         if response.rowcount > 0:
             self.cursor.execute("SELECT roda_id "
                                 "FROM rodas "
@@ -538,7 +539,7 @@ class DatabaseSQLite:
                 "isOwner": None
                 }
 
-    # APPoeira Function: Returns event detail. Function called when /evennt-detail invoked
+    # APPoeira Function: Returns event detail. Function called when /event-detail invoked
     def event_detail(self, event_id, user_id):
         import Methods
         sailor = Methods.Sailor()
@@ -629,6 +630,142 @@ class DatabaseSQLite:
                 "isMember": None,
                 "hasVoted": None,
                 "isOwner": None
+                }
+
+    # APPoeira Function: Inserts a new Event on the DB. Function called when /event-created invoked
+    def event_create(self, owners, name, description, date, pic_url, invited, platform, latitude, longitude, city, country, phone, convided, key):
+        self.open_connection()
+        if platform == 6:
+            self.cursor.execute("SELECT city_id FROM cities WHERE city_name = ?;", (city,))
+            city_id = self.cursor.fetchone()
+            self.cursor.execute("SELECT country_id FROM countries WHERE country_name = ?;", (country,))
+            country_id = self.cursor.fetchone()
+            response = self.cursor.execute("INSERT INTO events ("
+                                           "event_name, "
+                                           "event_date, "
+                                           "event_pic_url, "
+                                           "event_description, "
+                                           "event_verified, "
+                                           "event_latitude, "
+                                           "event_longitude, "
+                                           "event_city_id, "
+                                           "event_country_id, "
+                                           "event_phone"
+                                           ") "
+                                           "VALUES (?,?,?,?,?,?,?,?,?,?);",
+                                           (name, date, pic_url if pic_url != "" else self.default_group_image,
+                                            description, True, latitude, longitude, city_id[0], country_id[0], phone))
+        else:
+            response = self.cursor.execute("INSERT INTO events ("
+                                           "event_name, "
+                                           "event_date, "
+                                           "event_pic_url, "
+                                           "event_description, "
+                                           "event_verified, "
+                                           "event_phone"
+                                           ") "
+                                           "VALUES (?,?,?,?,?,?,?,?,?);",
+                                           (name, date, pic_url if pic_url != "" else self.default_group_image,
+                                            description, True, phone))
+        if response.rowcount > 0:
+            self.cursor.execute("SELECT event_id "
+                                "FROM events "
+                                "WHERE event_name = ?"
+                                "AND event_date = ?",
+                                (name, date))
+            event_id = self.cursor.fetchone()
+            if event_id is not None:
+                self.cursor.execute("INSERT INTO event_platform ("
+                                    "e_p_event_id, "
+                                    "e_p_platform_id, "
+                                    "e_p_key"
+                                    ") "
+                                    "VALUES (?,?,?)",
+                                    (event_id[0], platform, key))
+                self.cursor.execute("INSERT INTO user_event ("
+                                    "u_e_user_id, "
+                                    "u_e_event_id, "
+                                    "u_e_role_id, "
+                                    "u_e_accepted"
+                                    ") "
+                                    "VALUES (?,?,?,?)",
+                                    (owners[0], event_id[0], 1, True))
+                inviteds = [(user_invited, event_id[0], 2, False) for user_invited in invited]
+                self.cursor.executemany("INSERT INTO user_event ("
+                                        "u_e_user_id, "
+                                        "u_e_event_id, "
+                                        "u_e_role_id, "
+                                        "u_e_accepted"
+                                        ") "
+                                        "VALUES (?,?,?,?)",
+                                        (inviteds))
+                convideds = [(user_convided, event_id[0], 3, False) for user_convided in convided]
+                self.cursor.executemany("INSERT INTO user_event ("
+                                        "u_e_user_id, "
+                                        "u_e_event_id, "
+                                        "u_e_role_id, "
+                                        "u_e_accepted"
+                                        ") "
+                                        "VALUES (?,?,?,?)",
+                                        (convideds))
+                self.close_connection()
+                return {"id": event_id[0],
+                        }
+        self.close_connection()
+        return {"id": None,
+                }
+
+    # APPoeira Function: Inserts a new Online on the DB. Function called when /online-created invoked
+    def online_create(self, owners, name, description, date, pic_url, invited, platform, phone, key):
+        self.open_connection()
+        response = self.cursor.execute("INSERT INTO onlines ("
+                                       "online_name, "
+                                       "online_date, "
+                                       "online_pic_url, "
+                                       "online_description, "
+                                       "online_verified, "
+                                       "online_phone "
+                                       ") "
+                                       "VALUES (?,?,?,?,?,?);",
+                                       (name, date, pic_url if pic_url != "" else self.default_group_image,
+                                        description, True, phone))
+        if response.rowcount > 0:
+            self.cursor.execute("SELECT online_id "
+                                "FROM onlines "
+                                "WHERE online_name = ?"
+                                "AND online_date = ?",
+                                (name, date))
+            online_id = self.cursor.fetchone()
+            if online_id is not None:
+                self.cursor.execute("INSERT INTO online_platform ("
+                                    "o_p_online_id, "
+                                    "o_p_platform_id, "
+                                    "o_p_key"
+                                    ") "
+                                    "VALUES (?,?,?)",
+                                    (online_id, platform, key))
+                self.cursor.execute("INSERT INTO user_online ("
+                                    "u_o_user_id, "
+                                    "u_o_online_id, "
+                                    "u_o_role_id, "
+                                    "u_o_accepted"
+                                    ") "
+                                    "VALUES (?,?,?,?)",
+                                    (owners[0], online_id[0], 1, True))
+                inviteds = [(user_invited, online_id[0], 2, False) for user_invited in invited]
+                self.cursor.executemany("INSERT INTO user_online ("
+                                        "u_o_user_id, "
+                                        "u_o_online_id, "
+                                        "u_o_role_id, "
+                                        "u_o_accepted"
+                                        ") "
+                                        "VALUES (?,?,?,?)",
+                                        (inviteds))
+                self.close_connection()
+                return {"id": online_id[0],
+                        }
+        self.close_connection()
+        return {"id": None,
                 }
 
     # APPoeira Function: Sign Up functionality. Called when /sign-up invoked
