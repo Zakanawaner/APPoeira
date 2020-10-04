@@ -3,10 +3,9 @@
 #       -> Hacerse con imágenes genéricas e iconos custom y con un logo                         ALBERTO
 #       -> Estudiar las animaciones de Android                                                  INVESTIGAR
 #       -> Hacer el script de actualización de grupos (ver como cojones hacer lo de facebook)   INVESTIGAR
-#       -> Añadir auth para todas las activitys que lo necesitan                                PUEDO
+#       -> Añadir auth para todas las activities que lo necesitan                               PUEDO
 #       -> Añadir poder subir fotos de la librería o hacerlas en el momento                     INVESTIGAR
 #       -> Salir de grupos, rodas, etc                                                          PENSARLO
-#       -> Meter la clase de server en methods de server stuff                                  PUEDO
 #       -> Sanitizar inputs                                                                     INVESTIGAR
 #       -> Cuando aparece el teclado se lleva el bottombar                                      INVESTIGAR
 #  GroupListViewv
@@ -27,15 +26,11 @@
 #       -> Hacer que aparezca la imagen en la etiqueta del marcador                             INVESTIGAR
 #  RodaDetailView                                                                               OK
 #  RodaDetailMoreView
-#       -> No implementada                                                                      PUEDO
-#       -> Hacer lo mismo que con los grupos                                                    PUEDO
+#       -> Ver qué pasa con la información que se envía al servidor y la que se muestra         PUEDO
 #  RodaModificationView
 #       -> La imagen por defecto no carga                                                       INVESTIGAR
-#  EventListView
-#       -> No implementada                                                                      PUEDO
-#       -> Añadir un botón de crear evento                                                      PUEDO
-#       -> hacer la parte del mapa                                                              PUEDO
-#  EventDetailView                                                                              PROBAR
+#  EventListView                                                                                OK
+#  EventDetailView                                                                              OK
 #  EventDetailMoreView
 #       -> No implementada                                                                      PUEDO
 #       -> Hacer lo mismo que con los grupos                                                    PUEDO
@@ -73,6 +68,7 @@
 #       -> Añadir notificaciones de invitaciones a grupos o cualquier otra cosa                 PENSARLO
 #  UserDetailView
 #       -> Añadir la funcionalidad de postear cosas en tu propio perfil (fotos, etc)            INVESTIGAR
+#       -> Poner bonica la actividad                                                            PUEDO
 #  ProfileModificationView                                                                      OK
 #  BottomNavigationMenu                                                                         OK
 #  ------
@@ -161,11 +157,11 @@ def group_detail_more():
     return make_response(json.dumps(details), 200)
 
 # Token
-@app.route('/new-comment', methods=["POST"])
-def new_comment():
-    ok = librarian.new_comment(request.__getattr__('json')['groupId'],
-                               request.__getattr__('json')['userId'],
-                               request.__getattr__('json')['comment'])
+@app.route('/new-comment-group', methods=["POST"])
+def new_comment_group():
+    ok = librarian.new_comment_group(request.__getattr__('json')['groupId'],
+                                     request.__getattr__('json')['userId'],
+                                     request.__getattr__('json')['comment'])
     return make_response(json.dumps(ok), 200)
 
 # Token
@@ -222,20 +218,71 @@ def roda_create():
         return make_response(json.dumps(roda), 200)
     return make_response(json.dumps(roda), 200)
 
+# Token
+@app.route('/roda-comments', methods=["POST"])
+def roda_comments():
+    rodas = librarian.roda_comments(request.__getattr__('json')['groupId'])
+    if rodas is not None:
+        return make_response(json.dumps(rodas), 200)
+    return make_response(json.dumps(rodas), 200)
+
+# Token
+@app.route('/roda-join', methods=["POST"])
+def roda_join():
+    ok = librarian.join_roda(request.__getattr__('json')['groupId'],
+                             request.__getattr__('json')['userId'],
+                             request.__getattr__('json')['roleId'])
+    return make_response(json.dumps(ok), 200)
+
+# Token
+@app.route('/roda-detail-more', methods=["POST"])
+def roda_detail_more():
+    details = librarian.roda_detail_more(request.__getattr__('json')['groupId'])
+    if details is not None:
+        return make_response(json.dumps(details), 200)
+    return make_response(json.dumps(details), 200)
+
+# Token
+@app.route('/new-comment-roda', methods=["POST"])
+def new_comment_roda():
+    ok = librarian.new_comment_roda(request.__getattr__('json')['groupId'],
+                                    request.__getattr__('json')['userId'],
+                                    request.__getattr__('json')['comment'])
+    return make_response(json.dumps(ok), 200)
+
+# Token
+@app.route('/user-rated-roda', methods=["POST"])
+def user_rated_roda():
+    stars = librarian.user_rated_roda(request.__getattr__('json')['UserId'],
+                                      request.__getattr__('json')['GroupId'],
+                                      request.__getattr__('json')['Rating'])
+    return make_response(json.dumps(stars), 200)
+
 
 # Events #
 #########
+@app.route('/location-event', methods=["POST"])
+def location_event():
+    event = librarian.event_get_based_on_location(float(request.__getattr__('json')['latitude']),
+                                                  float(request.__getattr__('json')['longitude']),
+                                                  float(request.__getattr__('json')['distance']))
+    if event is not None:
+        return make_response(json.dumps(event), 200)
+    return make_response(json.dumps(event), 200)
+
+
 @app.route('/event-detail', methods=["POST"])
 def event_detail():
     if interceptor.check_for_token(request.__getattr__('json'), librarian) == 1:
         detail = librarian.event_detail(request.__getattr__('json')['eventId'],
-                                       request.__getattr__('json')['userId'])
+                                        request.__getattr__('json')['userId'])
         if detail['id'] is not None:
             return make_response(json.dumps(detail), 200)
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
         return make_response(json.dumps({'error': "Missing Token"}), 200)
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
+    return make_response(json.dumps(None), 200)
 
 # Token
 @app.route('/event-create', methods=["POST"])
@@ -247,12 +294,12 @@ def event_create():
                                    request.__getattr__('json')['picUrl'],
                                    request.__getattr__('json')['invited'],
                                    int(request.__getattr__('json')['platform']),
-                                   float(request.__getattr__('json')['latitude']),
-                                   float(request.__getattr__('json')['longitude']),
+                                   float(request.__getattr__('json')['latitude']) if 'latitude' in request.__getattr__('json') else 0.0,
+                                   float(request.__getattr__('json')['longitude']) if 'longitude' in request.__getattr__('json') else 0.0,
                                    sailor.city_from_latlng(float(request.__getattr__('json')['latitude']),
-                                                           float(request.__getattr__('json')['longitude'])),
+                                                           float(request.__getattr__('json')['longitude'])) if 'latitude' in request.__getattr__('json') else '',
                                    sailor.country_from_latlng(float(request.__getattr__('json')['latitude']),
-                                                              float(request.__getattr__('json')['longitude'])),
+                                                              float(request.__getattr__('json')['longitude']))if 'latitude' in request.__getattr__('json') else '',
                                    request.__getattr__('json')['phone'],
                                    request.__getattr__('json')['convided'],
                                    request.__getattr__('json')['key'])

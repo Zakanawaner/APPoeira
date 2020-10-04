@@ -539,26 +539,138 @@ class DatabaseSQLite:
                 "isOwner": None
                 }
 
+    # APPoeira Function: Returns all events within a distance. Function called when /location-event invoked
+    def event_get_based_on_location(self, latitude, longitude, distance_):
+        offset = distance_ * self.relationDistance
+        self.open_connection()
+        self.cursor.execute("SELECT "
+                            "event_id, "
+                            "event_name, "
+                            "event_date, "
+                            "event_pic_url, "
+                            "event_verified, "
+                            "event_latitude, "
+                            "event_longitude "
+                            "FROM events "
+                            "WHERE event_latitude BETWEEN ? AND ? "
+                            "AND event_longitude BETWEEN ? AND ?;",
+                            (latitude - offset, latitude + offset,
+                             longitude - offset, longitude + offset,))
+        presential_events = self.cursor.fetchall()
+        self.cursor.execute("SELECT "
+                            "event_id, "
+                            "event_name, "
+                            "event_date, "
+                            "event_pic_url, "
+                            "event_verified, "
+                            "event_latitude, "
+                            "event_longitude "
+                            "FROM events "
+                            "WHERE event_latitude isnull "
+                            "AND event_longitude isnull;")
+        online_events = self.cursor.fetchall()
+        if presential_events is not None and online_events is not None:
+            events = presential_events + online_events
+        elif presential_events is not None and online_events is None:
+            events = presential_events
+        elif presential_events is None and online_events is not None:
+            events = online_events
+        else:
+            events = None
+        if events is not None:
+            result = []
+            events = list(events)
+            for event in events:
+                self.cursor.execute("SELECT "
+                                    "user_id, "
+                                    "user_apelhido, "
+                                    "rank_name "
+                                    "FROM users "
+                                    "INNER JOIN ranks ON user_rank_id = rank_id "
+                                    "INNER JOIN user_event ON u_e_user_id = user_id AND u_e_role_id = 1 "
+                                    "INNER JOIN events ON event_id = ?;",
+                                    (list(event)[0],))
+                owner = self.cursor.fetchone()
+                self.cursor.execute("SELECT "
+                                    "e_p_platform_id, "
+                                    "e_p_key "
+                                    "FROM event_platform "
+                                    "INNER JOIN events ON e_p_event_id = event_id "
+                                    "AND event_id = ?;",
+                                    (list(event)[0],))
+                platform = self.cursor.fetchone()
+                result.append({"id": list(event)[0],
+                               "name": list(event)[1],
+                               "date": list(event)[2].split('-')[0] + '-' +
+                                       list(event)[2].split('-')[1] + '-' +
+                                       list(event)[2].split('-')[2] + ' ' +
+                                       list(event)[2].split('-')[3] + ':' +
+                                       list(event)[2].split('-')[4],
+                               "picUrl": list(event)[3],
+                               "verified": False if list(event)[4] == 0 else True,
+                               'latitude': list(event)[5],
+                               'longitude': list(event)[6],
+                               "distance": float('%.1f' % geopy.distance.distance(lonlat(*[latitude, longitude]),
+                                                                                  (lonlat(list(event)[5],
+                                                                                          list(event)[6]))).km),
+                               'ownerApelhido': list(owner)[1],
+                               'ownerRank': list(owner)[2],
+                               'platform': list(platform)[0],
+                               'key': list(platform)[1]
+                               })
+            return result
+        return [{"id": None,
+                 "name": None,
+                 "date": None,
+                 "picUrl": None,
+                 "verified": False,
+                 'latitude': None,
+                 'longitude': None,
+                 "distance": None,
+                 'ownerApelhido': None,
+                 'ownerRank': None,
+                 'platform': 0,
+                 'key': None
+                 }]
+
     # APPoeira Function: Returns event detail. Function called when /event-detail invoked
     def event_detail(self, event_id, user_id):
         import Methods
         sailor = Methods.Sailor()
         self.open_connection()
-        self.cursor.execute("SELECT event_id, "
-                            "event_name, "
-                            "event_pic_url, "
-                            "event_description, "
-                            "event_phone, "
-                            "event_verified, "
-                            "city_name, "
-                            "country_name, "
-                            "event_latitude, "
-                            "event_longitude "
-                            "FROM events JOIN cities JOIN countries "
-                            "ON events.event_city_id = cities.city_id AND "
-                            "events.event_country_id = countries.country_id "
-                            "WHERE event_id = ?;",
-                            (event_id,))
+        self.cursor.execute("SELECT event_latitude FROM events WHERE event_id = ?", (event_id,))
+        aux_event = list(self.cursor.fetchone())
+        if aux_event[0] is None:
+            presential = False
+            self.cursor.execute("SELECT event_id, "
+                                "event_name, "
+                                "event_pic_url, "
+                                "event_description, "
+                                "event_phone, "
+                                "event_verified, "
+                                "platform_name "
+                                "FROM events "
+                                "INNER JOIN event_platform ON event_id = e_p_event_id "
+                                "INNER JOIN platforms ON platform_id = e_p_platform_id "
+                                "WHERE event_id = ?;",
+                                (event_id,))
+        else:
+            presential = True
+            self.cursor.execute("SELECT event_id, "
+                                "event_name, "
+                                "event_pic_url, "
+                                "event_description, "
+                                "event_phone, "
+                                "event_verified, "
+                                "city_name, "
+                                "country_name, "
+                                "event_latitude, "
+                                "event_longitude "
+                                "FROM events JOIN cities JOIN countries "
+                                "ON events.event_city_id = cities.city_id AND "
+                                "events.event_country_id = countries.country_id "
+                                "WHERE event_id = ?;",
+                                (event_id,))
         event = self.cursor.fetchone()
         if event is not None:
             import statistics
@@ -569,10 +681,10 @@ class DatabaseSQLite:
                                     (list(event)[0],))
                 ratings = list(self.cursor.fetchall())
                 ratings = [rating[0] for rating in ratings] if ratings != [] else None
-            self.cursor.execute("SELECT event_id "
-                                "FROM events "
-                                "INNER JOIN user_event ON event_id = u_e_event_id "
-                                "INNER JOIN users ON u_e_user_id = user_id "
+            self.cursor.execute("SELECT user_id "
+                                "FROM users "
+                                "INNER JOIN user_event ON user_id = u_e_user_id "
+                                "INNER JOIN events ON u_e_event_id = event_id "
                                 "WHERE user_id = ? "
                                 "AND event_id = ?;",
                                 (user_id, event_id))
@@ -585,10 +697,10 @@ class DatabaseSQLite:
                                 "AND event_id = ?;",
                                 (user_id, event_id))
             vote = self.cursor.fetchall()
-            self.cursor.execute("SELECT event_id "
-                                "FROM events "
-                                "INNER JOIN user_event ON event_id = u_e_event_id "
-                                "INNER JOIN users ON u_e_user_id = user_id AND u_e_role_id = 1 "
+            self.cursor.execute("SELECT user_id "
+                                "FROM users "
+                                "INNER JOIN user_event ON user_id = u_e_user_id "
+                                "INNER JOIN events ON u_e_event_id = event_id AND u_e_role_id = 1 "
                                 "WHERE user_id = ? "
                                 "AND event_id = ?;",
                                 (user_id, event_id))
@@ -603,11 +715,12 @@ class DatabaseSQLite:
                     "verified": False if list(event)[5] == 0 else True,
                     "rating": statistics.mean(ratings) if ratings is not None else 0.0,
                     "votes": len(ratings) if ratings is not None else 0,
-                    "address": sailor.full_address_from_latlng(list(event)[8], list(event)[9]),
-                    "city": list(event)[6],
-                    "country": list(event)[7],
-                    "latitude": list(event)[8],
-                    "longitude": list(event)[9],
+                    "address": sailor.full_address_from_latlng(list(event)[8], list(event)[9]) if presential else "",
+                    "city": list(event)[6] if presential else "",
+                    "country": list(event)[7] if presential else "",
+                    "latitude": list(event)[8] if presential else 0.0,
+                    "longitude": list(event)[9] if presential else 0.0,
+                    "platform": list(event)[6] if not presential else "",
                     "isMember": True if member != [] else False,
                     "hasVoted": vote[0][0] if vote != [] else 0,
                     "isOwner": True if owner != [] else False,
@@ -627,6 +740,7 @@ class DatabaseSQLite:
                 "country": None,
                 "latitude": None,
                 "longitude": None,
+                "platform": None,
                 "isMember": None,
                 "hasVoted": None,
                 "isOwner": None
@@ -664,7 +778,7 @@ class DatabaseSQLite:
                                            "event_verified, "
                                            "event_phone"
                                            ") "
-                                           "VALUES (?,?,?,?,?,?,?,?,?);",
+                                           "VALUES (?,?,?,?,?,?);",
                                            (name, date, pic_url if pic_url != "" else self.default_group_image,
                                             description, True, phone))
         if response.rowcount > 0:
@@ -1044,7 +1158,7 @@ class DatabaseSQLite:
         return None
 
     # APPoeira Function: new comment on a group. Called when /new-comment invoked
-    def new_comment(self, group_id, user_id, comment):
+    def new_comment_group(self, group_id, user_id, comment):
         self.open_connection()
         response = self.cursor.execute("INSERT INTO user_comment_group ("
                                        "u_c_g_user_id, "
@@ -1087,7 +1201,7 @@ class DatabaseSQLite:
                                        "u_g_date, "
                                        "u_g_accepted"
                                        ")"
-                                       "VALUES (?,?,?,?);",
+                                       "VALUES (?,?,?,?,?);",
                                        (user_id, group_id, role_id, datetime.utcnow(), True))
         if response.rowcount > 0:
             self.cursor.execute("UPDATE groups SET "
@@ -1118,7 +1232,7 @@ class DatabaseSQLite:
         if user_info is not None:
             self.cursor.execute("SELECT group_id,"
                                 "group_name,"
-                                "group_picture_url,"
+                                "group_picture_url, "
                                 "group_role_name, "
                                 "u_g_date, "
                                 "u_g_accepted "
@@ -1153,7 +1267,7 @@ class DatabaseSQLite:
             group_comments = self.cursor.fetchall()
             self.cursor.execute("SELECT roda_id,"
                                 "roda_name,"
-                                "roda_pic_url "
+                                "roda_pic_url, "
                                 "roda_role_name, "
                                 "u_r_date, "
                                 "u_r_accepted "
@@ -1759,6 +1873,128 @@ class DatabaseSQLite:
                             "WHERE user_id = ?;",
                             (user_id,))
         self.close_connection()
+
+    # APPoeira Function: Roda detail information. Called when /roda-detail-more invoked
+    def roda_detail_more(self, roda_id):
+        self.open_connection()
+        self.cursor.execute("SELECT user_id, "
+                            "user_apelhido, "
+                            "user_pic_url, "
+                            "user_premium, "
+                            "rank_name, "
+                            "roda_role_name "
+                            "FROM rodas "
+                            "INNER JOIN users INNER JOIN ranks ON user_rank_id = rank_id "
+                            "INNER JOIN user_roda ON u_r_user_id = user_id "
+                            "INNER JOIN rodaroles ON u_r_role_id = roda_role_id "
+                            "WHERE u_r_roda_id = ? AND "
+                            "roda_id = ?;", (roda_id, roda_id))
+        details = self.cursor.fetchall()
+        if details is not None:
+            details = list(details)
+            self.close_connection()
+            return [{'groupSchool': None,
+                     'userId': list(detail)[0],
+                     'userApelhido': list(detail)[1],
+                     'userPicUrl': list(detail)[2],
+                     'userPremium': False if list(detail)[3] == 0 else True,
+                     'userRank': list(detail)[4],
+                     'userGroupRole': list(detail)[5],
+                     } for detail in details]
+        self.close_connection()
+        return None
+
+    # APPoeira Function: Roda detail information. Called when /roda-comments invoked
+    def roda_comments(self, roda_id):
+        self.open_connection()
+        self.cursor.execute("SELECT u_c_r_comment, "
+                            "u_c_r_date, "
+                            "u_c_r_user_id, "
+                            "user_apelhido, "
+                            "user_pic_url "
+                            "FROM user_comment_roda "
+                            "INNER JOIN rodas ON roda_id = u_c_r_roda_id "
+                            "INNER JOIN users ON user_id = u_c_r_user_id "
+                            "WHERE roda_id = ?;",
+                            (roda_id,))
+        comments = self.cursor.fetchall()
+        if comments is not None:
+            comments = list(comments)
+            self.close_connection()
+            return [{'userId': list(comment)[2],
+                     'picUrl': list(comment)[4],
+                     'userApelhido': list(comment)[3],
+                     'comment': list(comment)[0],
+                     'date': list(comment)[1],
+                     } for comment in comments]
+        self.close_connection()
+        return None
+
+    # APPoeira Function: new comment on a roda. Called when /new-comment invoked
+    def new_comment_roda(self, roda_id, user_id, comment):
+        self.open_connection()
+        response = self.cursor.execute("INSERT INTO user_comment_roda ("
+                                       "u_c_r_user_id, "
+                                       "u_c_r_roda_id, "
+                                       "u_c_r_comment, "
+                                       "u_c_r_date"
+                                       ")"
+                                       "VALUES (?,?,?,?);",
+                                       (user_id, roda_id, comment, datetime.utcnow()))
+        self.close_connection()
+        return {'ok': True if response.rowcount > 0 else False}
+
+    def user_rated_roda(self, user_id, roda_id, stars):
+        self.open_connection()
+        self.cursor.execute("SELECT u_r_r_rating "
+                            "FROM user_rating_roda "
+                            "WHERE u_r_r_user_id = ? "
+                            "AND u_r_r_roda_id = ?",
+                            (user_id, roda_id))
+        rating = self.cursor.fetchone()
+        if rating is None:
+            self.cursor.execute("INSERT INTO user_rating_roda ("
+                                "u_r_r_user_id, "
+                                "u_r_r_roda_id, "
+                                "u_r_r_rating, "
+                                "u_r_r_date"
+                                ")"
+                                "VALUES (?,?,?,?);",
+                                (user_id, roda_id, stars, datetime.utcnow()))
+            self.connection.commit()
+            self.cursor.execute("UPDATE rodas SET "
+                                "roda_verified = 1 "
+                                "WHERE roda_id = ?;",
+                                (roda_id,))
+            self.connection.commit()
+            self.close_connection()
+            return {'ok': True,
+                    'stars': stars
+                    }
+        else:
+            self.close_connection()
+            return {'ok': False,
+                    'stars': rating[0]
+                    }
+
+    def join_roda(self, roda_id, user_id, role_id):
+        self.open_connection()
+        response = self.cursor.execute("INSERT INTO user_roda ("
+                                       "u_r_user_id, "
+                                       "u_r_roda_id, "
+                                       "u_r_role_id, "
+                                       "u_r_date, "
+                                       "u_r_accepted"
+                                       ")"
+                                       "VALUES (?,?,?,?,?);",
+                                       (user_id, roda_id, role_id, datetime.utcnow(), True))
+        if response.rowcount > 0:
+            self.cursor.execute("UPDATE rodas SET "
+                                "roda_verified = 1 "
+                                "WHERE roda_id = ?;",
+                                (roda_id,))
+        self.close_connection()
+        return {'ok': True if response.rowcount > 0 else False}
 
     # Opens a DB connection
     def open_connection(self):
