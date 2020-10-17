@@ -5,14 +5,15 @@ import geopy
 import facebook
 import requests
 import phonenumbers
+import boto3
 from SQLite import DatabaseSQLite
 
 
+# Interceptor is in charge of the security. From token to sanitize inputs
 class Interceptor:
     def __init__(self, key):
         self.key = key
 
-    # Create personal token
     def create_personal_token(self, user_id, email, name, last_name, apelhido, rank):
         payload = {
             'user_id': user_id,
@@ -46,6 +47,45 @@ class Interceptor:
             return 3
 
 
+# Elephant has all the constants of the project and is the interface with AWS S3
+class Elephant:
+    def __init__(self):
+        # Snoopy constants
+        self.FACEBOOK_TOKEN = 'EAAEd3h8ryTIBAIysNjY7gfk2E0dGnvnAfspf3FHNSIeAl8xQc2Awq3LLDc2cPeWke3lffIsN2FvtJSpHd6cF9LxDIYvGvvLgI1qRLfhQNL55bilVt4AxjJKZAYUpOZBqLxIZBiuHTwdDUuWtkh612108PaTOj7V4d7KUMmInUji0fPxu7mBgbewolJ1NVox2S4jDRaKQgZDZD'
+        self.GOOGLE_MAPS_KEY = 'AIzaSyD1tm94d6438H0vJ23MA8nJLsAOak6GYgo'
+        self.INSTAGRAM_TOKEN = 'IGQVJXVVNjbDZALYjZAtYlpyaDA5VS1vSXVLSUFFdVc5VWlieDFadl9UdW9yUFI2TWlOcUpDYm1DMjQ2YmVmSko2SlpWSllCaGZAxSUxuUGptNWxKYkRuZAHVQSGNSVnRrbXViblpUcWV3dGVBbUtsdFdYQgZDZD'
+        self.CITIES_PATH = "./Source/worldcities.csv"
+        # DB constants
+        self.DB_PATH = "./DB/database.db"
+        self.RELATION_DISTANCE = 0.009009009
+        self.DEFAULT_GROUP_IMAGE = 'https://image.flaticon.com/icons/png/512/33/33887.png'
+        self.DEFAULT_USER_IMAGE = 'https://image.flaticon.com/icons/png/512/928/928642.png'
+        # AWS S3 configuration
+        self.REGION_NAME = 'eu-west-2'
+        self.BUCKET_NAME = 'appoeira'
+        self.AWS_ACCESS_KEY_ID = 'AKIASYPYF2Y4TIF5W6WE'
+        self.AWS_ACCESS_KEY_SECRET = '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'
+        self.s3_instance = boto3.resource("s3",
+                                          aws_access_key_id=self.AWS_ACCESS_KEY_ID,
+                                          aws_secret_access_key=self.AWS_ACCESS_KEY_SECRET)
+
+    def upload_object(self, file, object_id=0):
+        file_name = file.filename
+        if object_id != 0:
+            occurrences = [i for i, a in enumerate(file_name) if a == "_"]
+            file_name = file.filename[:occurrences[1]+1] + str(object_id) + file.filename[occurrences[2]:]
+        occurrences = [i for i, a in enumerate(file_name) if a == "_"]
+        file_to_upload = file.read()
+        old_objects = self.s3_instance.Bucket(self.BUCKET_NAME).objects.filter(Prefix=file_name[:occurrences[2]])
+        for old in old_objects:
+            old.delete()
+        obj = self.s3_instance.Bucket(self.BUCKET_NAME).put_object(Key='{}.jpg'.format(file_name),
+                                                                   Body=file_to_upload,
+                                                                   ACL='public-read')
+        return "https://{}.s3.{}.amazonaws.com/{}".format(obj.bucket_name, self.REGION_NAME, obj.key), obj is not None, obj.key
+
+
+# Sailor is in charge of handling all the geographical methods
 class Sailor:
     def __init__(self):
         self.locator = geopy.geocoders.Nominatim(user_agent='Sailor')
@@ -68,6 +108,7 @@ class Sailor:
         return ', '.join(self.locator.reverse(str(latitude) + ',' + str(longitude), language='en').address.split(',')[0:2])
 
 
+# Postman handles all the mail that is implemented in the application
 class Postman:
     def __init__(self):
         self.mode = 0
@@ -76,10 +117,9 @@ class Postman:
             "MAIL_PORT": 465,
             "MAIL_USE_TLS": False,
             "MAIL_USE_SSL": True,
-            "MAIL_USERNAME": 'ficcionyciencia.contact@gmail.com',
-            "MAIL_PASSWORD": 'yqvhskrqgxqzknuf'
+            "MAIL_USERNAME": 'appoeira.onethousandprojects@gmail.com',
+            "MAIL_PASSWORD": 'uhjltusxkzycmrji'
         }
-
 
     def html_email_verification(self, mode):
         self.mode = mode
@@ -92,7 +132,7 @@ class Postman:
                     <title>APPoeira: Email no verificado</title>
                 </head>
                     <body>
-                        <h1>Hola, {}</h1>
+                        <h2>Hola, {}.</h2>
                         <p>¡¡Tu email ha sido verificado!!</p>
                     </body>
                 </html>
@@ -106,7 +146,7 @@ class Postman:
                     <title>APPoeira: Email no verificado</title>
                 </head>
                     <body>
-                        <h1>Hola, {}.</h1>
+                        <h2>Hola, {}.</h2>
                         <p>Hubo un error en la verificación de tu email.</p> 
                         <p>Puedes solicitar de nuevo que te enviemos el email de verificaición entrando en APPoeira</p>
                     </body>
@@ -121,7 +161,7 @@ class Postman:
                     <title>APPoeira: Email no verificado</title>
                 </head>
                     <body>
-                        <h1>Hola</h1>
+                        <h2>Hola</h2>
                         <p>El link no era correcto.</p> 
                         <p>Puedes solicitar de nuevo que te enviemos el email de verificaición entrando en APPoeira</p>
                     </body>
@@ -129,14 +169,14 @@ class Postman:
                 '''
 
 
-# TODO estudiar la nueva versión 8 del graph de facebook, que no entiendo nada
+# Snoopy is the one that gets the data from the cloud
 class Snoopy:
-    def __init__(self, facebook_token, google_maps_key):
+    def __init__(self, facebook_token, google_maps_key, elephant):
         super(Snoopy, self).__init__()
         self.facebookSnoopy = facebook.GraphAPI(access_token=facebook_token)
         self.googleMapsKey = google_maps_key
         self.geoCoder = geopy.geocoders.Nominatim(user_agent='snoopy')
-        self.database = DatabaseSQLite('./DB/database.db')  # Database()
+        self.database = DatabaseSQLite(elephant.DB_PATH, elephant.RELATION_DISTANCE, elephant.DEFAULT_GROUP_IMAGE, elephant.DEFAULT_USER_IMAGE)  # Database()
 
     def get_city_from_lat_lng(self, latitude, longitude):
         # Function that returns the address from a lat long.
@@ -195,8 +235,8 @@ class Snoopy:
                              'street': body['vicinity'],
                              'zip': address.raw['address']['postcode'] if 'postcode' in address.raw['address'] else None
                              },
-                'website': detail['result']['website'] if 'website' in detail['result'].keys() else None,
-                'phone': detail['result']['international_phone_number'] if 'international_phone_number' in detail['result'].keys() else None,
+                'website': detail['result']['website'] if 'result' in detail.keys() and 'website' in detail['result'].keys() else None,
+                'phone': detail['result']['international_phone_number'] if 'result' in detail.keys() and 'international_phone_number' in detail['result'].keys() else None,
                 'about': None,
                 'id': body['place_id']
                 }
@@ -220,7 +260,7 @@ class Snoopy:
             body['about'] = None
         address = self.geoCoder.reverse(str(body['location']['latitude']) + ', ' + str(body['location']['longitude']))
         return {'name': body['name'],
-                'pic_url': None,  # TODO enterarse de como coger url de imagen en facebook
+                'pic_url': None,
                 'location': {'city': address.raw['address']['city'] if 'city' in address.raw['address'] else None,
                              'country': address.raw['address']['country'] if 'country' in address.raw['address'] else None,
                              'latitude': address.latitude,

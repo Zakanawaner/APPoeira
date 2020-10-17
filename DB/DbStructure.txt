@@ -10,10 +10,8 @@ group_facebook_id TEXT,
 group_google_id TEXT,
 group_description TEXT,
 group_address TEXT,
-group_location TEXT,  # TODO Eliminar
 group_city_id INTEGER,
 group_country_id INTEGER,
-group_owner_id INTEGER,  # TODO Eliminar
 group_school_id INTEGER,
 group_latitude REAL,
 group_longitude REAL,

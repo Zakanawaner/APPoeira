@@ -1,8 +1,8 @@
-from Methods import Snoopy
+from Methods import Snoopy, Elephant
 
 # Scan to fill databases
 FACEBOOK_TOKEN = 'EAAEd3h8ryTIBAIysNjY7gfk2E0dGnvnAfspf3FHNSIeAl8xQc2Awq3LLDc2cPeWke3lffIsN2FvtJSpHd6cF9LxDIYvGvvLgI1qRLfhQNL55bilVt4AxjJKZAYUpOZBqLxIZBiuHTwdDUuWtkh612108PaTOj7V4d7KUMmInUji0fPxu7mBgbewolJ1NVox2S4jDRaKQgZDZD'
-GOOGLE_MAPS_KEY = 'AIzaSyBk44a2Vv2IPx7N90cKLhNGJlqOCaubt4o'
+GOOGLE_MAPS_KEY = 'AIzaSyD1tm94d6438H0vJ23MA8nJLsAOak6GYgo'
 INSTAGRAM_TOKEN = 'IGQVJXVVNjbDZALYjZAtYlpyaDA5VS1vSXVLSUFFdVc5VWlieDFadl9UdW9yUFI2TWlOcUpDYm1DMjQ2YmVmSko2SlpWSllCaGZAxSUxuUGptNWxKYkRuZAHVQSGNSVnRrbXViblpUcWV3dGVBbUtsdFdYQgZDZD'
 
 
@@ -10,7 +10,7 @@ def data_eater_groups():
     # We look on google places
     reader = open("./Source/worldcities.csv").read().split('\n')
     reader.pop(0)
-    reader = reader[2008:]
+    reader = reader[3593:]
     for city in reader:
         city = city.replace('"', '').split(',')
         city_id = snoopy.database.city_check(city[1])
@@ -19,10 +19,10 @@ def data_eater_groups():
         for group in go:
             group = snoopy.make_google_pretty(group)
             snoopy.database.group_check_google(group, city_id, country_id)
-        fb = snoopy.get_fb_nearby(latitude=float(city[2]), longitude=float(city[3]), distance=50000, limit=100, query='capoeira')['data']
-        for group in fb:
-            snoopy.make_facebook_pretty(group, city)
-            snoopy.database.group_compare_fb_go(group, city_id, country_id)
+        #fb = snoopy.get_fb_nearby(latitude=float(city[2]), longitude=float(city[3]), distance=50000, limit=100, query='capoeira')['data']
+        #for group in fb:
+        #    snoopy.make_facebook_pretty(group, city)
+        #    snoopy.database.group_compare_fb_go(group, city_id, country_id)
 
 
 def cagada_del_gilipollas():
@@ -57,7 +57,9 @@ def better_location():
 
 
 # We instantiate the Snoopy
-snoopy = Snoopy(FACEBOOK_TOKEN, GOOGLE_MAPS_KEY)
+elephant = Elephant()
+snoopy = Snoopy(FACEBOOK_TOKEN, GOOGLE_MAPS_KEY, elephant)
+
 data_eater_groups()
 snoopy.database.group_compare_all()
 
