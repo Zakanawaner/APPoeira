@@ -50,9 +50,11 @@ class Interceptor:
 # Elephant has all the constants of the project and is the interface with AWS S3
 class Elephant:
     def __init__(self):
+        # APP constants
+        self.APP_ROUTE = 'https://234bf21550ef.ngrok.io'
         # Snoopy constants
         self.FACEBOOK_TOKEN = 'EAAEd3h8ryTIBAIysNjY7gfk2E0dGnvnAfspf3FHNSIeAl8xQc2Awq3LLDc2cPeWke3lffIsN2FvtJSpHd6cF9LxDIYvGvvLgI1qRLfhQNL55bilVt4AxjJKZAYUpOZBqLxIZBiuHTwdDUuWtkh612108PaTOj7V4d7KUMmInUji0fPxu7mBgbewolJ1NVox2S4jDRaKQgZDZD'
-        self.GOOGLE_MAPS_KEY = 'AIzaSyD1tm94d6438H0vJ23MA8nJLsAOak6GYgo'
+        self.GOOGLE_MAPS_KEY = 'AIzaSyATucbLXuXUMgYmynDqjy9qiY1Egz1Dh-o'
         self.INSTAGRAM_TOKEN = 'IGQVJXVVNjbDZALYjZAtYlpyaDA5VS1vSXVLSUFFdVc5VWlieDFadl9UdW9yUFI2TWlOcUpDYm1DMjQ2YmVmSko2SlpWSllCaGZAxSUxuUGptNWxKYkRuZAHVQSGNSVnRrbXViblpUcWV3dGVBbUtsdFdYQgZDZD'
         self.CITIES_PATH = "./Source/worldcities.csv"
         # DB constants
@@ -120,6 +122,7 @@ class Postman:
             "MAIL_USERNAME": 'appoeira.onethousandprojects@gmail.com',
             "MAIL_PASSWORD": 'uhjltusxkzycmrji'
         }
+        self.VERIFICATION_BODY = 'Hi! How are you? Here is the link you wanted.\n{}/email-verification?token={}'
 
     def html_email_verification(self, mode):
         self.mode = mode
@@ -167,6 +170,9 @@ class Postman:
                     </body>
                 </html>
                 '''
+
+    def verification_body(self, token, route):
+        return self.VERIFICATION_BODY.format(route, token)
 
 
 # Snoopy is the one that gets the data from the cloud

@@ -2,7 +2,7 @@ from Methods import Snoopy, Elephant
 
 # Scan to fill databases
 FACEBOOK_TOKEN = 'EAAEd3h8ryTIBAIysNjY7gfk2E0dGnvnAfspf3FHNSIeAl8xQc2Awq3LLDc2cPeWke3lffIsN2FvtJSpHd6cF9LxDIYvGvvLgI1qRLfhQNL55bilVt4AxjJKZAYUpOZBqLxIZBiuHTwdDUuWtkh612108PaTOj7V4d7KUMmInUji0fPxu7mBgbewolJ1NVox2S4jDRaKQgZDZD'
-GOOGLE_MAPS_KEY = 'AIzaSyD1tm94d6438H0vJ23MA8nJLsAOak6GYgo'
+GOOGLE_MAPS_KEY = 'AIzaSyDIDDkCDEoBHyF-sS2mjuhq0o_0UU59Fuc'
 INSTAGRAM_TOKEN = 'IGQVJXVVNjbDZALYjZAtYlpyaDA5VS1vSXVLSUFFdVc5VWlieDFadl9UdW9yUFI2TWlOcUpDYm1DMjQ2YmVmSko2SlpWSllCaGZAxSUxuUGptNWxKYkRuZAHVQSGNSVnRrbXViblpUcWV3dGVBbUtsdFdYQgZDZD'
 
 
@@ -10,8 +10,9 @@ def data_eater_groups():
     # We look on google places
     reader = open("./Source/worldcities.csv").read().split('\n')
     reader.pop(0)
-    reader = reader[3593:]
+    reader = reader[4715:]
     for city in reader:
+        print(city)
         city = city.replace('"', '').split(',')
         city_id = snoopy.database.city_check(city[1])
         country_id = snoopy.database.country_check(city[4])

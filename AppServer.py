@@ -2,15 +2,11 @@
 #  General
 #       -> Hacerse con imágenes genéricas e iconos custom y con un logo                         ALBERTO
 #       -> Estudiar las animaciones de Android                                                  INVESTIGAR
-#       -> Hacer el script de actualización de grupos                                           INVESTIGAR
 #       -> Sanitizar inputs                                                                     INVESTIGAR
-#       -> Cuando aparece el teclado se lleva el bottombar a veces                              INVESTIGAR
 #       -> Bloquear a la gente que no ha verificado su email                                    PENSARLO
-#       -> Al verificar el email hacer más accesible la historia                                PENSARLO
 #       -> Mirar bien los correos para que sean bonicos                                         PENSARLO
-#       -> En la actualización y signup comprobar que el email ya existe o no                   PUEDO
 #       -> Hacer directorios en S3                                                              PUEDO
-#       -> Para cada creación/modificación, determinar que es necesario y pedirlo               PUEDO
+#       -> hacer modificaciones de objetos desde el detalle view (Roda y online hecho)          PUEDO
 #  GroupListView                                                                                OK
 #  GroupDetailView                                                                              OK
 #  GroupDetailMoreView
@@ -18,9 +14,7 @@
 #          alguna manera acredite a esa persona. Se le pedirá el teléfono y se enviará un mail con este teléfono a los
 #          demás instructores de la ciudad. Este mail habrá dos botones uno con el sí y el otro con el no que, o bien
 #          me llegará a mí, o bien se validará de forma automática. Informarle con un Popup     PENSARLO
-#  GroupModificationView
-#       -> Sólo el creador podrá implementarla, o las personas a las que él habilite            PUEDO
-#       -> Invitar a gente (solo el dueño del grupo) y las invitacinoes tienen que aceptarse    PUEDO
+#  GroupModificationView                                                                        OK
 #  RodaListView                                                                                 OK
 #  RodaDetailView                                                                               OK
 #  RodaDetailMoreView                                                                           OK
@@ -37,11 +31,12 @@
 #       -> Añadir logo                                                                          ALBERTO
 #  SignUpView
 #       -> Añadir logo                                                                          ALBERTO
-#  NewsView                                                                                     OK
+#  NewsView
+#       -> Pensar en qué noticial coger y cómo gestionarlas                                     PENSARLO
+#       -> Hacer el icono con notificaciones                                                    INVESTIGAR
 #  SearchView                                                                                   OK
 #  HelpView
 #       -> No implementada                                                                      PUEDO
-#       -> Estaría guapo meter vídeos tutoriales, pero igual es una puta flipada                INVESTIGAR
 #  TopNavigationMenu
 #       -> Añadir logo                                                                          ALBERTO
 #       -> Añadir notificaciones de invitaciones a grupos o cualquier otra cosa                 PENSARLO
@@ -55,6 +50,7 @@
 #       -> Anidar qweries aunque lo que me devuelva esté feo
 #       -> Estudiar el control de activities abiertas
 #       -> Añadir la funcionalidad de postear cosas en tu propio perfil (fotos, etc)
+#       -> Hacer el script de actualización de grupos
 
 import jwt
 import json
@@ -110,6 +106,30 @@ def group_detail():
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
         return make_response(json.dumps({'error': "Missing Token"}), 200)
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
+        return make_response(json.dumps({'error': "Invalid Token"}), 200)
+
+
+@app.route('/group-create', methods=["POST"])
+def group_create():
+    if interceptor.check_for_token(json.loads(request.form['body']), librarian) == 1:
+        group = librarian.group_create(json.loads(request.form['body'])['owners'],
+                                       json.loads(request.form['body'])['name'],
+                                       json.loads(request.form['body'])['description'],
+                                       float(json.loads(request.form['body'])['latitude']),
+                                       float(json.loads(request.form['body'])['longitude']),
+                                       sailor.city_from_latlng(float(json.loads(request.form['body'])['latitude']),
+                                                               float(json.loads(request.form['body'])['longitude'])),
+                                       sailor.country_from_latlng(float(json.loads(request.form['body'])['latitude']),
+                                                                  float(json.loads(request.form['body'])['longitude'])),
+                                       json.loads(request.form['body'])['phone'],
+                                       elephant, request.files['upload'])
+        if group is not None:
+            return make_response(json.dumps(group), 200)
+        return make_response(json.dumps(group), 200)
+
+    elif interceptor.check_for_token(json.loads(request.form['body']), librarian) == 2:
+        return make_response(json.dumps({'error': "Missing Token"}), 200)
+    elif interceptor.check_for_token(json.loads(request.form['body']), librarian) == 3:
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
 
@@ -219,19 +239,35 @@ def roda_detail():
 @app.route('/roda-create', methods=["POST"])
 def roda_create():
     if interceptor.check_for_token(json.loads(request.form['body']), librarian) == 1:
-        roda = librarian.roda_create(json.loads(request.form['body'])['owners'],
-                                     json.loads(request.form['body'])['name'],
-                                     json.loads(request.form['body'])['description'],
-                                     json.loads(request.form['body'])['date'],
-                                     json.loads(request.form['body'])['invited'],
-                                     float(json.loads(request.form['body'])['latitude']),
-                                     float(json.loads(request.form['body'])['longitude']),
-                                     sailor.city_from_latlng(float(json.loads(request.form['body'])['latitude']),
-                                                             float(json.loads(request.form['body'])['longitude'])),
-                                     sailor.country_from_latlng(float(json.loads(request.form['body'])['latitude']),
-                                                                float(json.loads(request.form['body'])['longitude'])),
-                                     json.loads(request.form['body'])['phone'],
-                                     elephant, request.files['upload'])
+        if json.loads(request.form['body'])['id'] > 0:
+            roda = librarian.roda_modification(json.loads(request.form['body'])['owners'],
+                                               json.loads(request.form['body'])['name'],
+                                               json.loads(request.form['body'])['description'],
+                                               json.loads(request.form['body'])['date'],
+                                               json.loads(request.form['body'])['invited'],
+                                               float(json.loads(request.form['body'])['latitude']),
+                                               float(json.loads(request.form['body'])['longitude']),
+                                               sailor.city_from_latlng(float(json.loads(request.form['body'])['latitude']),
+                                                                       float(json.loads(request.form['body'])['longitude'])),
+                                               sailor.country_from_latlng(float(json.loads(request.form['body'])['latitude']),
+                                                                          float(json.loads(request.form['body'])['longitude'])),
+                                               json.loads(request.form['body'])['phone'],
+                                               json.loads(request.form['body'])['id'],
+                                               elephant, request.files['upload'])
+        else:
+            roda = librarian.roda_create(json.loads(request.form['body'])['owners'],
+                                         json.loads(request.form['body'])['name'],
+                                         json.loads(request.form['body'])['description'],
+                                         json.loads(request.form['body'])['date'],
+                                         json.loads(request.form['body'])['invited'],
+                                         float(json.loads(request.form['body'])['latitude']),
+                                         float(json.loads(request.form['body'])['longitude']),
+                                         sailor.city_from_latlng(float(json.loads(request.form['body'])['latitude']),
+                                                                 float(json.loads(request.form['body'])['longitude'])),
+                                         sailor.country_from_latlng(float(json.loads(request.form['body'])['latitude']),
+                                                                    float(json.loads(request.form['body'])['longitude'])),
+                                         json.loads(request.form['body'])['phone'],
+                                         elephant, request.files['upload'])
         if roda is not None:
             return make_response(json.dumps(roda), 200)
         return make_response(json.dumps(roda), 200)
@@ -239,6 +275,19 @@ def roda_create():
     elif interceptor.check_for_token(json.loads(request.form['body']), librarian) == 2:
         return make_response(json.dumps({'error': "Missing Token"}), 200)
     elif interceptor.check_for_token(json.loads(request.form['body']), librarian) == 3:
+        return make_response(json.dumps({'error': "Invalid Token"}), 200)
+
+
+@app.route('/roda-delete', methods=["POST"])
+def roda_delete():
+    if interceptor.check_for_token(request.__getattr__('json'), librarian) == 1:
+        detail = librarian.roda_delete(request.__getattr__('json')['objectId'],
+                                       request.__getattr__('json')['userId'])
+        if detail['ok'] is not None:
+            return make_response(json.dumps(detail), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
+        return make_response(json.dumps({'error': "Missing Token"}), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
 
@@ -556,15 +605,27 @@ def user_rated_online():
 @app.route('/online-create', methods=["POST"])
 def online_create():
     if interceptor.check_for_token(json.loads(request.form['body']), librarian) == 1:
-        online = librarian.online_create(json.loads(request.form['body'])['owners'],
-                                         json.loads(request.form['body'])['name'],
-                                         json.loads(request.form['body'])['description'],
-                                         json.loads(request.form['body'])['date'],
-                                         json.loads(request.form['body'])['invited'],
-                                         int(json.loads(request.form['body'])['platform']),
-                                         json.loads(request.form['body'])['phone'],
-                                         json.loads(request.form['body'])['key'],
-                                         elephant, request.files['upload'])
+        if json.loads(request.form['body'])['id'] > 0:
+            online = librarian.online_modification(json.loads(request.form['body'])['owners'],
+                                             json.loads(request.form['body'])['name'],
+                                             json.loads(request.form['body'])['description'],
+                                             json.loads(request.form['body'])['date'],
+                                             json.loads(request.form['body'])['invited'],
+                                             int(json.loads(request.form['body'])['platform']),
+                                             json.loads(request.form['body'])['phone'],
+                                             json.loads(request.form['body'])['key'],
+                                             json.loads(request.form['body'])['id'],
+                                             elephant, request.files['upload'])
+        else:
+            online = librarian.online_create(json.loads(request.form['body'])['owners'],
+                                             json.loads(request.form['body'])['name'],
+                                             json.loads(request.form['body'])['description'],
+                                             json.loads(request.form['body'])['date'],
+                                             json.loads(request.form['body'])['invited'],
+                                             int(json.loads(request.form['body'])['platform']),
+                                             json.loads(request.form['body'])['phone'],
+                                             json.loads(request.form['body'])['key'],
+                                             elephant, request.files['upload'])
         if online is not None:
             return make_response(json.dumps(online), 200)
         return make_response(json.dumps(online), 200)
@@ -574,8 +635,21 @@ def online_create():
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
 
+@app.route('/online-delete', methods=["POST"])
+def online_delete():
+    if interceptor.check_for_token(request.__getattr__('json'), librarian) == 1:
+        detail = librarian.online_delete(request.__getattr__('json')['objectId'],
+                                         request.__getattr__('json')['userId'])
+        if detail['ok'] is not None:
+            return make_response(json.dumps(detail), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
+        return make_response(json.dumps({'error': "Missing Token"}), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
+        return make_response(json.dumps({'error': "Invalid Token"}), 200)
+
 # Users #
 #########
+
 
 @app.route('/sign-up', methods=["POST"])
 def signup_user():
@@ -644,6 +718,39 @@ def user_detail():
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
 
+@app.route('/profile-update', methods=["POST"])
+def user_profile_update():
+    if interceptor.check_for_token(json.loads(request.form['body']), librarian) == 1:
+        user, old_email = librarian.user_update_profile(int(json.loads(request.form['body'])['userId']),
+                                                        json.loads(request.form['body'])['firstName'],
+                                                        json.loads(request.form['body'])['lastName'],
+                                                        json.loads(request.form['body'])['apelhido'],
+                                                        json.loads(request.form['body'])['email'],
+                                                        json.loads(request.form['body'])['password'],
+                                                        json.loads(request.form['body'])['newPassword'],
+                                                        json.loads(request.form['body'])['rank'],
+                                                        elephant, request.files['upload'])
+        if "{0:b}".format(user['error'])[6] == '1' and json.loads(request.form['body'])['email'] != old_email:
+            librarian.unverify_user_email(int(json.loads(request.form['body'])['userId']))
+            send_verification_mail(interceptor.create_validation_token(int(json.loads(request.form['body'])['userId']),
+                                                                       user['email'],
+                                                                       user['name'],
+                                                                       user['lastName'],
+                                                                       user['apelhido'],
+                                                                       user['rank']), user['email'])
+        user['token'] = interceptor.create_personal_token(int(json.loads(request.form['body'])['userId']),
+                                                          user['email'],
+                                                          user['name'],
+                                                          user['lastName'],
+                                                          user['apelhido'],
+                                                          user['rank'])
+        return make_response(json.dumps(user), 200)
+    elif interceptor.check_for_token(json.loads(request.form['body']), librarian) == 2:
+        return make_response(json.dumps({'error': "Missing Token"}), 200)
+    elif interceptor.check_for_token(json.loads(request.form['body']), librarian) == 3:
+        return make_response(json.dumps({'error': "Invalid Token"}), 200)
+
+
 # Common #
 ##########
 
@@ -670,44 +777,10 @@ def are_there_news():
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
 
-@app.route('/profile-update', methods=["POST"])
-def user_profile_update():
+@app.route('/news', methods=["POST"])
+def news():
     if interceptor.check_for_token(request.__getattr__('json'), librarian) == 1:
-        user = librarian.user_update_profile(request.__getattr__('json')['userId'],
-                                             request.__getattr__('json')['firstName'],
-                                             request.__getattr__('json')['lastName'],
-                                             request.__getattr__('json')['apelhido'],
-                                             request.__getattr__('json')['email'],
-                                             request.__getattr__('json')['password'],
-                                             request.__getattr__('json')['newPassword'],
-                                             request.__getattr__('json')['rank'])
-        if "{0:b}".format(user['error'])[6] == '1':
-            librarian.unverify_user_email(request.__getattr__('json')['userId'])
-            send_verification_mail(interceptor.create_validation_token(request.__getattr__('json')['userId'],
-                                                                       user['email'],
-                                                                       user['name'],
-                                                                       user['lastName'],
-                                                                       user['apelhido'],
-                                                                       user['rank']), user['email'])
-        else:
-            user['token'] = interceptor.create_personal_token(request.__getattr__('json')['userId'],
-                                                              user['email'],
-                                                              user['name'],
-                                                              user['lastName'],
-                                                              user['apelhido'],
-                                                              user['rank'])
-        return make_response(json.dumps(user), 200)
-    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
-        return make_response(json.dumps({'error': "Missing Token"}), 200)
-    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
-        return make_response(json.dumps({'error': "Invalid Token"}), 200)
-
-# TODO A eliminar
-@app.route('/upload-picture', methods=["POST"])
-def upload_picture():
-    if interceptor.check_for_token(request.form, librarian) == 1:
-        url, ok, key = elephant.upload_object(request.files['upload'])
-        response = librarian.upload_picture(url, ok, key)
+        response = librarian.news(request.__getattr__('json')['userId'])
         return make_response(json.dumps(response), 200)
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
         return make_response(json.dumps({'error': "Missing Token"}), 200)
@@ -728,16 +801,10 @@ def email_verification():
 
 def send_verification_mail(token, email):
     with app.app_context():
-        text = """
-            <p>Hi!<br>
-                How are you?<br>
-                Here is the <a href="https://b0262077574f.ngrok.io/email-verification?token={}">link</a> you wanted.
-            </p>
-            """.format(token)
         msg = Message(subject="Hello",
                       sender=app.config.get("MAIL_USERNAME"),
-                      recipients=[email],
-                      body=text)
+                      recipients=[email])
+        msg.body = postman.verification_body(token, elephant.APP_ROUTE)
         mail.send(msg)
 
 

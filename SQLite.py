@@ -301,7 +301,8 @@ class DatabaseSQLite:
                             "group_longitude "
                             "FROM groups "
                             "WHERE group_latitude BETWEEN ? AND ? "
-                            "AND group_longitude BETWEEN ? AND ?;",
+                            "AND group_longitude BETWEEN ? AND ? "
+                            "AND group_deleted = 0;",
                             (latitude - offset, latitude + offset,
                              longitude - offset, longitude + offset,))
         results = self.cursor.fetchall()
@@ -350,7 +351,8 @@ class DatabaseSQLite:
                             "roda_longitude "
                             "FROM rodas "
                             "WHERE roda_latitude BETWEEN ? AND ? "
-                            "AND roda_longitude BETWEEN ? AND ?;",
+                            "AND roda_longitude BETWEEN ? AND ? "
+                            "AND roda_deleted = 0;",
                             (latitude - offset, latitude + offset,
                              longitude - offset, longitude + offset,))
         rodas = self.cursor.fetchall()
@@ -424,11 +426,12 @@ class DatabaseSQLite:
                                        "roda_longitude, "
                                        "roda_city_id, "
                                        "roda_country_id, "
-                                       "roda_phone "
+                                       "roda_phone, "
+                                       "roda_deleted"
                                        ") "
-                                       "VALUES (?,?,?,?,?,?,?,?,?);",
+                                       "VALUES (?,?,?,?,?,?,?,?,?,?);",
                                        (name, date, description, True, latitude, longitude, city_id[0],
-                                        country_id[0], phone))
+                                        country_id[0], phone, False))
         if response.rowcount > 0:
             self.cursor.execute("SELECT roda_id "
                                 "FROM rodas "
@@ -466,6 +469,137 @@ class DatabaseSQLite:
                         }
         self.close_connection()
         return {"id": None,
+                }
+
+    # APPoeira Function: Deletes a Roda from the DB. Function called when /roda-delete invoked
+    def roda_delete(self, roda_id, owner_id,):
+        self.open_connection()
+        self.cursor.execute("SELECT u_r_user_id "
+                            "FROM user_roda "
+                            "WHERE u_r_roda_id = ? "
+                            "AND u_r_role_id = 1;",
+                            (roda_id,))
+        user_id = self.cursor.fetchone()
+        if user_id[0] == owner_id:
+            response = self.cursor.execute("UPDATE rodas SET "
+                                           "roda_deleted = 1 "
+                                           "WHERE roda_id = ?;",
+                                           (roda_id,))
+            if response.rowcount > 0:
+                self.close_connection()
+                return {"ok": True,
+                        }
+        self.close_connection()
+        return {"ok": None,
+                }
+
+    # APPoeira Function: Inserts a new Roda on the DB. Function called when /roda-created invoked
+    def roda_modification(self, owners, name, description, date, invited, latitude, longitude, city, country, phone, roda_id, elephant, image):
+        self.open_connection()
+        self.cursor.execute("SELECT city_id FROM cities WHERE city_name = ?;", (city,))
+        city_id = self.cursor.fetchone()
+        self.cursor.execute("SELECT country_id FROM countries WHERE country_name = ?;", (country,))
+        country_id = self.cursor.fetchone()
+        url, ok, pic_name = elephant.upload_object(image, roda_id)
+        response = self.cursor.execute("UPDATE rodas "
+                                       "SET "
+                                       "roda_name = ?, "
+                                       "roda_date = ?, "
+                                       "roda_description = ?, "
+                                       "roda_verified = ?, "
+                                       "roda_latitude = ?, "
+                                       "roda_longitude = ?, "
+                                       "roda_city_id = ?, "
+                                       "roda_country_id = ?, "
+                                       "roda_phone = ?, "
+                                       "roda_pic_url = ? "
+                                       "WHERE roda_id = ?;",
+                                       (name, date, description, True, latitude, longitude, city_id[0],
+                                        country_id[0], phone, url if url != "" else self.default_group_image, roda_id))
+        if response.rowcount > 0:
+            self.cursor.execute("DELETE FROM user_roda "
+                                "WHERE u_r_roda_id = ? "
+                                "AND u_r_role_id = 2;",
+                                (roda_id,))
+            inviteds = [(user_invited, roda_id, 2, datetime.utcnow(), False) for user_invited in invited]
+            self.cursor.executemany("INSERT INTO user_roda ("
+                                    "u_r_user_id, "
+                                    "u_r_roda_id, "
+                                    "u_r_role_id, "
+                                    "u_r_date, "
+                                    "u_r_accepted"
+                                    ") "
+                                    "VALUES (?,?,?,?,?)",
+                                    (inviteds))
+            self.close_connection()
+            return {"id": roda_id,
+                    }
+        self.close_connection()
+        return {"id": None,
+                }
+
+    # APPoeira Function: Inserts a new Online on the DB. Function called when /online-created invoked
+    def online_modification(self, owners, name, description, date, invited, platform, phone, key, online_id, elephant, image):
+        self.open_connection()
+        url, ok, pic_name = elephant.upload_object(image, online_id)
+        response = self.cursor.execute("UPDATE onlines "
+                                       "SET "
+                                       "online_name = ?, "
+                                       "online_date = ?, "
+                                       "online_description = ?, "
+                                       "online_verified = ?, "
+                                       "online_phone = ?, "
+                                       "online_pic_url = ? "
+                                       "WHERE online_id = ?;",
+                                       (name, date, description, True, phone, url if url != "" else self.default_group_image, online_id))
+        if response.rowcount > 0:
+            self.cursor.execute("DELETE FROM user_online "
+                                "WHERE u_o_online_id = ? "
+                                "AND u_o_role_id = 2;",
+                                (online_id,))
+            inviteds = [(user_invited, online_id, 2, datetime.utcnow(), False) for user_invited in invited]
+            self.cursor.executemany("INSERT INTO user_online ("
+                                    "u_o_user_id, "
+                                    "u_o_online_id, "
+                                    "u_o_role_id, "
+                                    "u_o_date, "
+                                    "u_o_accepted"
+                                    ") "
+                                    "VALUES (?,?,?,?,?);",
+                                    (inviteds))
+            self.cursor.execute("UPDATE online_platform "
+                                "SET "
+                                "o_p_platform_id = ?, "
+                                "o_p_key = ? "
+                                "WHERE o_p_online_id = ?;",
+                                (platform, key, online_id))
+            self.close_connection()
+            return {"id": online_id,
+                    }
+        self.close_connection()
+        return {"id": None,
+                }
+
+    # APPoeira Function: Deletes an Online from the DB. Function called when /online-delete invoked
+    def online_delete(self, online_id, owner_id, ):
+        self.open_connection()
+        self.cursor.execute("SELECT u_o_user_id "
+                            "FROM user_online "
+                            "WHERE u_o_online_id = ? "
+                            "AND u_o_role_id = 1;",
+                            (online_id,))
+        user_id = self.cursor.fetchone()
+        if user_id[0] == owner_id:
+            response = self.cursor.execute("UPDATE onlines SET "
+                                           "online_deleted = 1 "
+                                           "WHERE online_id = ?;",
+                                           (online_id,))
+            if response.rowcount > 0:
+                self.close_connection()
+                return {"ok": True,
+                        }
+        self.close_connection()
+        return {"ok": None,
                 }
 
     # APPoeira Function: Returns roda detail. Function called when /roda-detail invoked
@@ -575,7 +709,8 @@ class DatabaseSQLite:
                             "event_longitude "
                             "FROM events "
                             "WHERE event_latitude BETWEEN ? AND ? "
-                            "AND event_longitude BETWEEN ? AND ?;",
+                            "AND event_longitude BETWEEN ? AND ? "
+                            "AND event_deleted = 0;",
                             (latitude - offset, latitude + offset,
                              longitude - offset, longitude + offset,))
         presential_events = self.cursor.fetchall()
@@ -589,7 +724,8 @@ class DatabaseSQLite:
                             "event_longitude "
                             "FROM events "
                             "WHERE event_latitude isnull "
-                            "AND event_longitude isnull;")
+                            "AND event_longitude isnull "
+                            "AND event_deleted = 0;")
         online_events = self.cursor.fetchall()
         if presential_events is not None and online_events is not None:
             events = presential_events + online_events
@@ -796,21 +932,23 @@ class DatabaseSQLite:
                                            "event_longitude, "
                                            "event_city_id, "
                                            "event_country_id, "
-                                           "event_phone"
+                                           "event_phone, "
+                                           "event_deleted "
                                            ") "
-                                           "VALUES (?,?,?,?,?,?,?,?,?);",
+                                           "VALUES (?,?,?,?,?,?,?,?,?,?);",
                                            (name, date,description, True, latitude, longitude, city_id[0],
-                                            country_id[0], phone))
+                                            country_id[0], phone, False))
         else:
             response = self.cursor.execute("INSERT INTO events ("
                                            "event_name, "
                                            "event_date, "
                                            "event_description, "
                                            "event_verified, "
-                                           "event_phone"
+                                           "event_phone, "
+                                           "event_deleted"
                                            ") "
-                                           "VALUES (?,?,?,?,?);",
-                                           (name, date, description, True, phone))
+                                           "VALUES (?,?,?,?,?,?);",
+                                           (name, date, description, True, phone, False))
         if response.rowcount > 0:
             self.cursor.execute("SELECT event_id "
                                 "FROM events "
@@ -875,10 +1013,11 @@ class DatabaseSQLite:
                                        "online_date, "
                                        "online_description, "
                                        "online_verified, "
-                                       "online_phone "
+                                       "online_phone, "
+                                       "online_deleted"
                                        ") "
-                                       "VALUES (?,?,?,?,?);",
-                                       (name, date, description, True, phone))
+                                       "VALUES (?,?,?,?,?,?);",
+                                       (name, date, description, True, phone, False))
         if response.rowcount > 0:
             self.cursor.execute("SELECT online_id "
                                 "FROM onlines "
@@ -945,14 +1084,15 @@ class DatabaseSQLite:
                                 "user_password,"
                                 "user_rank_id,"
                                 "user_school_id, "
-                                "user_email_verified "
+                                "user_email_verified, "
+                                "user_deleted"
                                 ") "
-                                "VALUES (?,?,?,?,?,?,?,?,?,?,?);",
+                                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?);",
                                 (first_name, last_name,
                                  apelhido, email,
                                  datetime.utcnow(), False,
                                  self.default_user_image,
-                                 crypt.hexdigest(), rank, 1, False))
+                                 crypt.hexdigest(), rank, 1, False, False))
             self.connection.commit()
             self.cursor.execute("SELECT user_id, "
                                 "user_apelhido, "
@@ -1002,7 +1142,8 @@ class DatabaseSQLite:
                             "user_email_verified, "
                             "user_email "
                             "FROM users "
-                            "WHERE user_email = ? AND user_password = ?;",
+                            "WHERE user_email = ? AND user_password = ?"
+                            "AND user_deleted = 0;",
                             (email, crypt.hexdigest()))
         user = self.cursor.fetchone()
         if user is not None:
@@ -1142,6 +1283,56 @@ class DatabaseSQLite:
                 "isMember": None,
                 "hasVoted": None,
                 "comment": None
+                }
+
+    # APPoeira Function: Inserts a new Group on the DB. Function called when /group-created invoked
+    def group_create(self, owners, name, description, latitude, longitude, city, country, phone, elephant, image):
+        self.open_connection()
+        self.cursor.execute("SELECT city_id FROM cities WHERE city_name = ?;", (city,))
+        city_id = self.cursor.fetchone()
+        self.cursor.execute("SELECT country_id FROM countries WHERE country_name = ?;", (country,))
+        country_id = self.cursor.fetchone()
+        response = self.cursor.execute("INSERT INTO groups ("
+                                       "group_name, "
+                                       "group_description, "
+                                       "group_verified, "
+                                       "group_latitude, "
+                                       "group_longitude, "
+                                       "group_city_id, "
+                                       "group_country_id, "
+                                       "group_phone, "
+                                       "group_deleted"
+                                       ") "
+                                       "VALUES (?,?,?,?,?,?,?,?,?);",
+                                       (name, description, True, latitude, longitude, city_id[0],
+                                        country_id[0], phone, False))
+        if response.rowcount > 0:
+            self.cursor.execute("SELECT group_id "
+                                "FROM groups "
+                                "WHERE group_latitude = ?"
+                                "AND group_longitude = ?",
+                                (latitude, longitude))
+            group_id = self.cursor.fetchone()
+            if group_id is not None:
+                url, ok, pic_name = elephant.upload_object(image, group_id[0])
+                self.cursor.execute("UPDATE groups SET "
+                                    "group_picture_url = ? "
+                                    "WHERE group_id = ?;",
+                                    (url if url != "" else self.default_group_image, group_id[0]))
+                self.cursor.execute("INSERT INTO user_group ("
+                                    "u_g_user_id, "
+                                    "u_g_group_id, "
+                                    "u_g_role_id, "
+                                    "u_g_accepted, "
+                                    "u_g_date "
+                                    ") "
+                                    "VALUES (?,?,?,?,?)",
+                                    (owners[0], group_id[0], 1, True, datetime.utcnow()))
+                self.close_connection()
+                return {"id": group_id[0],
+                        }
+        self.close_connection()
+        return {"id": None,
                 }
 
     # APPoeira Function: Group detail information. Called when /group-detail-more invoked
@@ -1296,7 +1487,8 @@ class DatabaseSQLite:
                                 "INNER JOIN users ON u_g_user_id = ? "
                                 "INNER JOIN user_group ON group_id = u_g_group_id "
                                 "INNER JOIN grouproles ON u_g_role_id = group_role_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND group_deleted = 0;",
                                 (user_id, user_id))
             groups = self.cursor.fetchall()
             self.cursor.execute("SELECT group_id, "
@@ -1307,7 +1499,8 @@ class DatabaseSQLite:
                                 "FROM groups "
                                 "INNER JOIN users ON u_r_g_user_id = ? "
                                 "INNER JOIN user_rating_group ON group_id = u_r_g_group_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND group_deleted = 0",
                                 (user_id, user_id))
             group_votes = self.cursor.fetchall()
             self.cursor.execute("SELECT group_id, "
@@ -1318,7 +1511,8 @@ class DatabaseSQLite:
                                 "FROM groups "
                                 "INNER JOIN users ON u_c_g_user_id = ? "
                                 "INNER JOIN user_comment_group ON group_id = u_c_g_group_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND group_deleted = 0",
                                 (user_id, user_id))
             group_comments = self.cursor.fetchall()
             self.cursor.execute("SELECT roda_id,"
@@ -1331,7 +1525,8 @@ class DatabaseSQLite:
                                 "INNER JOIN users ON u_r_user_id = ? "
                                 "INNER JOIN user_roda ON roda_id = u_r_roda_id "
                                 "INNER JOIN rodaroles ON u_r_role_id = roda_role_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND roda_deleted = 0;",
                                 (user_id, user_id))
             rodas = self.cursor.fetchall()
             self.cursor.execute("SELECT roda_id, "
@@ -1342,7 +1537,8 @@ class DatabaseSQLite:
                                 "FROM rodas "
                                 "INNER JOIN users ON u_r_r_user_id = ? "
                                 "INNER JOIN user_rating_roda ON roda_id = u_r_r_roda_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND roda_deleted = 0;",
                                 (user_id, user_id))
             roda_votes = self.cursor.fetchall()
             self.cursor.execute("SELECT roda_id, "
@@ -1353,7 +1549,8 @@ class DatabaseSQLite:
                                 "FROM rodas "
                                 "INNER JOIN users ON u_c_r_user_id = ? "
                                 "INNER JOIN user_comment_roda ON roda_id = u_c_r_roda_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND roda_deleted = 0;",
                                 (user_id, user_id))
             roda_comments = self.cursor.fetchall()
             self.cursor.execute("SELECT event_id,"
@@ -1366,7 +1563,8 @@ class DatabaseSQLite:
                                 "INNER JOIN users ON u_e_user_id = ? "
                                 "INNER JOIN user_event ON event_id = u_e_event_id "
                                 "INNER JOIN eventroles ON u_e_role_id = event_role_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND event_deleted = 0;",
                                 (user_id, user_id))
             events = self.cursor.fetchall()
             self.cursor.execute("SELECT event_id, "
@@ -1377,7 +1575,8 @@ class DatabaseSQLite:
                                 "FROM events "
                                 "INNER JOIN users ON u_r_e_user_id = ? "
                                 "INNER JOIN user_rating_event ON event_id = u_r_e_event_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND event_deleted = 0;",
                                 (user_id, user_id))
             event_votes = self.cursor.fetchall()
             self.cursor.execute("SELECT event_id, "
@@ -1388,7 +1587,8 @@ class DatabaseSQLite:
                                 "FROM events "
                                 "INNER JOIN users ON u_c_e_user_id = ? "
                                 "INNER JOIN user_comment_event ON event_id = u_c_e_event_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND event_deleted = 0;",
                                 (user_id, user_id))
             event_comments = self.cursor.fetchall()
             self.cursor.execute("SELECT online_id,"
@@ -1401,7 +1601,8 @@ class DatabaseSQLite:
                                 "INNER JOIN users ON u_o_user_id = ? "
                                 "INNER JOIN user_online ON online_id = u_o_online_id "
                                 "INNER JOIN onlineroles ON u_o_role_id = online_role_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND online_deleted = 0;",
                                 (user_id, user_id))
             onlines = self.cursor.fetchall()
             self.cursor.execute("SELECT online_id, "
@@ -1412,7 +1613,8 @@ class DatabaseSQLite:
                                 "FROM onlines "
                                 "INNER JOIN users ON u_r_o_user_id = ? "
                                 "INNER JOIN user_rating_online ON online_id = u_r_o_online_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND online_deleted = 0;",
                                 (user_id, user_id))
             online_votes = self.cursor.fetchall()
             self.cursor.execute("SELECT online_id, "
@@ -1423,7 +1625,8 @@ class DatabaseSQLite:
                                 "FROM onlines "
                                 "INNER JOIN users ON u_c_o_user_id = ? "
                                 "INNER JOIN user_comment_online ON online_id = u_c_o_online_id "
-                                "WHERE user_id = ?;",
+                                "WHERE user_id = ? "
+                                "AND online_deleted = 0;",
                                 (user_id, user_id))
             online_comments = self.cursor.fetchall()
             self.cursor.execute("SELECT user_id, "
@@ -1432,7 +1635,8 @@ class DatabaseSQLite:
                                 "u_f_u_date "
                                 "FROM users "
                                 "INNER JOIN user_follows_user ON u_f_u_user_id = user_id "
-                                "WHERE u_f_u_followed_id = ?;",
+                                "WHERE u_f_u_followed_id = ? "
+                                "AND user_deleted = 0;",
                                 (user_id,))
             followers = self.cursor.fetchall()
             self.cursor.execute("SELECT user_id, "
@@ -1441,7 +1645,8 @@ class DatabaseSQLite:
                                 "u_f_u_date "
                                 "FROM users "
                                 "INNER JOIN user_follows_user ON u_f_u_followed_id = user_id "
-                                "WHERE u_f_u_user_id = ?;",
+                                "WHERE u_f_u_user_id = ? "
+                                "AND user_deleted = 0;",
                                 (user_id,))
             followeds = self.cursor.fetchall()
             self.close_connection()
@@ -1771,6 +1976,28 @@ class DatabaseSQLite:
         result = self.cursor.fetchall()
         return {'response': result != []}
 
+    # APPoeira Function: News list. Called when /news invoked
+    def news(self, user_id):
+        self.open_connection()
+        self.cursor.execute("select u_g_user_id, 2 "
+                            "from user_group "
+                            "where u_g_user_id = ? and u_g_accepted = 0 "
+                            "UNION ALL "
+                            "select u_r_user_id, 3 "
+                            "from user_roda "
+                            "where u_r_user_id = ? and u_r_accepted = 0 "
+                            "UNION ALL "
+                            "select u_e_user_id, 4 "
+                            "from user_event "
+                            "where u_e_user_id = ? and u_e_accepted = 0 "
+                            "UNION ALL "
+                            "select u_o_user_id, 5 "
+                            "from user_online "
+                            "where u_o_user_id = ? and u_o_accepted = 0",
+                            (user_id, user_id, user_id, user_id,))
+        result = self.cursor.fetchall()
+        return {'response': result != []}
+
     # APPoeira Function: Search on the database. Called when /search invoked
     def search(self, search, mode):
         users = []
@@ -1787,7 +2014,8 @@ class DatabaseSQLite:
                                 "rank_name "
                                 "FROM users "
                                 "INNER JOIN ranks ON user_rank_id = rank_id "
-                                "WHERE user_apelhido LIKE '%{}%';".format(search))
+                                "WHERE user_apelhido LIKE '%{}%' "
+                                "AND user_deleted = 0;".format(search))
             result = self.cursor.fetchall()
             users = [{'id': list(user)[0],
                       'apelhido': list(user)[1],
@@ -1804,7 +2032,8 @@ class DatabaseSQLite:
                                 "group_picture_url, "
                                 "group_verified "
                                 "FROM groups "
-                                "WHERE group_name LIKE '%{}%';".format(search))
+                                "WHERE group_name LIKE '%{}%' "
+                                "AND group_deleted = 0;".format(search))
             results = self.cursor.fetchall()
             if results is not None:
                 import statistics
@@ -1831,7 +2060,8 @@ class DatabaseSQLite:
                                 "roda_pic_url, "
                                 "roda_verified "
                                 "FROM rodas "
-                                "WHERE roda_name LIKE '%{}%';".format(search))
+                                "WHERE roda_name LIKE '%{}%' "
+                                "AND roda_deleted = 0;".format(search))
             result = self.cursor.fetchall()
             if result is not None:
                 rodas = []
@@ -1862,7 +2092,8 @@ class DatabaseSQLite:
                                 "event_pic_url, "
                                 "event_verified "
                                 "FROM events "
-                                "WHERE event_name LIKE '%{}%';".format(search))
+                                "WHERE event_name LIKE '%{}%' "
+                                "AND event_deleted = 0;".format(search))
             result = self.cursor.fetchall()
             if result is not None:
                 events = []
@@ -1893,7 +2124,8 @@ class DatabaseSQLite:
                                 "online_pic_url, "
                                 "online_verified "
                                 "FROM onlines "
-                                "WHERE online_name LIKE '%{}%';".format(search))
+                                "WHERE online_name LIKE '%{}%' "
+                                "AND online_deleted = 0;".format(search))
             result = self.cursor.fetchall()
             if result is not None:
                 onlines = []
@@ -1966,10 +2198,16 @@ class DatabaseSQLite:
                     }
 
     # APPoeira Function: Profile updated. Called when /user-profile-updated
-    def user_update_profile(self, user_id, name, last_name, apelhido, email, password, new_password, rank):
+    def user_update_profile(self, user_id, name, last_name, apelhido, email, password, new_password, rank, elephant, image):
+        error = 0b1111111111
         crypt = hashlib.new('sha256')
         crypt.update(password.encode())
         self.open_connection()
+        self.cursor.execute("SELECT user_id "
+                            "FROM users "
+                            "WHERE user_email = ?;",
+                            (email,))
+        check_email = self.cursor.fetchone()
         self.cursor.execute("SELECT user_pic_url, "
                             "user_apelhido, "
                             "user_first_name, "
@@ -1982,70 +2220,79 @@ class DatabaseSQLite:
                             "WHERE user_id = ?;",
                             (user_id,))
         user = self.cursor.fetchone()
-        error = 0b1111111111
-        if user is not None:
-            user = list(user)
-            error = error - 0b0000000001 if name == user[2] or name == '' else error
-            error = error - 0b0000000010 if last_name == user[3] or last_name == '' else error
-            error = error - 0b0000000100 if apelhido == user[1] or apelhido == '' else error
-            error = error - 0b0000001000 if email == user[6] or email == '' else error
-            error = error - 0b0000010000 if password == '' else error
-            error = error - 0b0000100000 if new_password == '' else error
-            error = error - 0b0001000000 if rank == 0 or rank == user[7] else error
-            if crypt.hexdigest() == user[4]:
-                crypt = hashlib.new('sha256')
-                crypt.update(new_password.encode())
+        if check_email is None or check_email[0] == user_id:
+            if user is not None:
+                user = list(user)
+                url, ok, pic_name = elephant.upload_object(image, user_id)
                 self.cursor.execute("UPDATE users SET "
-                                    "user_password = ?, "
-                                    "user_email = ?, "
-                                    "user_first_name = ?, "
-                                    "user_last_name = ?, "
-                                    "user_apelhido = ?, "
-                                    "user_rank_id = ? "
-                                    "WHERE user_id = ?",
-                                    (crypt.hexdigest(),
-                                     email if email != user[6] and email != '' else user[6],
-                                     name if name != user[2] and name != '' else user[2],
-                                     last_name if last_name != user[3] and last_name != '' else user[3],
-                                     apelhido if apelhido != user[1] and apelhido != '' else user[1],
-                                     rank if rank != user[7] and rank > 0 else user[7], user[5]))
-                self.close_connection()
-                return {
-                        'apelhido': apelhido if apelhido != user[1] and apelhido != '' else user[1],
-                        'email': email if email != user[6] and email != '' else user[6],
-                        'token': '',
-                        'name': name if name != user[2] and name != '' else user[2],
-                        'lastName': last_name if last_name != user[3] and last_name != '' else user[3],
-                        'rank': rank if rank != user[7] and rank > 0 else user[7],
-                        'error': error
-                        }
-            else:
-                error = error - 0b0100000000
-                self.cursor.execute("UPDATE users SET "
-                                    "user_email = ?, "
-                                    "user_first_name = ?, "
-                                    "user_last_name = ?, "
-                                    "user_apelhido = ?, "
-                                    "user_rank_id = ? "
-                                    "WHERE user_id = ?",
-                                    (email if email != user[6] and email != '' else user[6],
-                                     name if name != user[2] and name != '' else user[2],
-                                     last_name if last_name != user[3] and last_name != '' else user[3],
-                                     apelhido if apelhido != user[1] and apelhido != '' else user[1],
-                                     rank if rank != user[7] and rank > 0 else user[7], user[5]))
-                self.close_connection()
-                return {
-                        'apelhido': apelhido if apelhido != user[1] and apelhido != '' else user[1],
-                        'email': email if email != user[6] and email != '' else user[6],
-                        'token': '',
-                        'name': name if name != user[2] and name != '' else user[2],
-                        'lastName': last_name if last_name != user[3] and last_name != '' else user[3],
-                        'rank': rank if rank != user[7] and rank > 0 else user[7],
-                        'error': error
-                        }
+                                    "user_pic_url = ? "
+                                    "WHERE user_id = ?;",
+                                    (url if url != "" else self.default_group_image, user_id))
+                if crypt.hexdigest() == user[4]:
+                    crypt = hashlib.new('sha256')
+                    crypt.update(new_password.encode())
+                    self.cursor.execute("UPDATE users SET "
+                                        "user_password = ?, "
+                                        "user_email = ?, "
+                                        "user_first_name = ?, "
+                                        "user_last_name = ?, "
+                                        "user_apelhido = ?, "
+                                        "user_rank_id = ? "
+                                        "WHERE user_id = ?",
+                                        (crypt.hexdigest(),
+                                         email if email != user[6] and email != '' else user[6],
+                                         name if name != user[2] and name != '' else user[2],
+                                         last_name if last_name != user[3] and last_name != '' else user[3],
+                                         apelhido if apelhido != user[1] and apelhido != '' else user[1],
+                                         rank if rank != user[7] and rank > 0 else user[7], user[5]))
+                    self.close_connection()
+                    return {'picUrl': url,
+                            'apelhido': apelhido if apelhido != user[1] and apelhido != '' else user[1],
+                            'email': email if email != user[6] and email != '' else user[6],
+                            'token': '',
+                            'name': name if name != user[2] and name != '' else user[2],
+                            'lastName': last_name if last_name != user[3] and last_name != '' else user[3],
+                            'rank': rank if rank != user[7] and rank > 0 else user[7],
+                            'error': error
+                            }, user[6]
+                else:
+                    error = error - 0b0100000000 if new_password != '' else error
+                    self.cursor.execute("UPDATE users SET "
+                                        "user_email = ?, "
+                                        "user_first_name = ?, "
+                                        "user_last_name = ?, "
+                                        "user_apelhido = ?, "
+                                        "user_rank_id = ? "
+                                        "WHERE user_id = ?",
+                                        (email if email != user[6] and email != '' else user[6],
+                                         name if name != user[2] and name != '' else user[2],
+                                         last_name if last_name != user[3] and last_name != '' else user[3],
+                                         apelhido if apelhido != user[1] and apelhido != '' else user[1],
+                                         rank if rank != user[7] and rank > 0 else user[7], user[5]))
+                    self.close_connection()
+                    return {'picUrl': url,
+                            'apelhido': apelhido if apelhido != user[1] and apelhido != '' else user[1],
+                            'email': email if email != user[6] and email != '' else user[6],
+                            'token': '',
+                            'name': name if name != user[2] and name != '' else user[2],
+                            'lastName': last_name if last_name != user[3] and last_name != '' else user[3],
+                            'rank': rank if rank != user[7] and rank > 0 else user[7],
+                            'error': error
+                            }, user[6]
+        else:
+            error = error - 0b0000001000
+            return {'picUrl': user[0],
+                    'apelhido': user[1],
+                    'email': user[6],
+                    'token': '',
+                    'name': user[2],
+                    'lastName': user[3],
+                    'rank': user[7],
+                    'error': error
+                    }, ''
         error = error - 0b1000000000
         self.close_connection()
-        return {
+        return {'picUrl': None,
                 'apelhido': None,
                 'email': None,
                 'token': '',
@@ -2053,23 +2300,7 @@ class DatabaseSQLite:
                 'lastName': None,
                 'rank': None,
                 'error': error
-                }
-
-    # APPoeira Function: Picture updated. Called when /upload-picture
-    def upload_picture(self, url, ok, key):
-        occurrences = [i for i, a in enumerate(key) if a == "_"]
-        object_type = key[:occurrences[0]]
-        object_subtype = key[occurrences[0] + 1:occurrences[1]]
-        type_id = key[occurrences[1] + 1:occurrences[2]]
-        subtype_id = key[occurrences[2] + 1:occurrences[3]]
-        self.open_connection()
-        response = self.cursor.execute("UPDATE {}s SET "
-                                       "{}_pic_url = ? "
-                                       "WHERE {}_id = ?;".format(object_type, object_type, object_type),
-                                       (url, type_id))
-        self.close_connection()
-        return {'ok': True if response.rowcount > 0 and ok else False,
-                'picUrl': url}
+                }, ''
 
     # APPoeira Function: Roda detail information. Called when /roda-detail-more invoked
     def roda_detail_more(self, roda_id):
@@ -2348,7 +2579,8 @@ class DatabaseSQLite:
                             "online_date, "
                             "online_pic_url, "
                             "online_verified "
-                            "FROM onlines;")
+                            "FROM onlines "
+                            "WHERE online_deleted = 0;")
         onlines = self.cursor.fetchall()
         if onlines is not None:
             import statistics
