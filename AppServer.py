@@ -3,17 +3,10 @@
 #       -> Hacerse con imágenes genéricas e iconos custom y con un logo                         ALBERTO
 #       -> Estudiar las animaciones de Android                                                  INVESTIGAR
 #       -> Sanitizar inputs                                                                     INVESTIGAR
-#       -> Bloquear a la gente que no ha verificado su email                                    PENSARLO
-#       -> Mirar bien los correos para que sean bonicos                                         PENSARLO
 #       -> Hacer directorios en S3                                                              PUEDO
-#       -> hacer modificaciones de objetos desde el detalle view (Roda y online hecho)          PUEDO
 #  GroupListView                                                                                OK
 #  GroupDetailView                                                                              OK
-#  GroupDetailMoreView
-#       -> Al decir que eres jefe de grupo, enviarle un mail pidiendo los datos del grupo o alguna acreditación que de
-#          alguna manera acredite a esa persona. Se le pedirá el teléfono y se enviará un mail con este teléfono a los
-#          demás instructores de la ciudad. Este mail habrá dos botones uno con el sí y el otro con el no que, o bien
-#          me llegará a mí, o bien se validará de forma automática. Informarle con un Popup     PENSARLO
+#  GroupDetailMoreView                                                                          OK
 #  GroupModificationView                                                                        OK
 #  RodaListView                                                                                 OK
 #  RodaDetailView                                                                               OK
@@ -32,14 +25,13 @@
 #  SignUpView
 #       -> Añadir logo                                                                          ALBERTO
 #  NewsView
-#       -> Pensar en qué noticial coger y cómo gestionarlas                                     PENSARLO
+#       -> Pensar en qué noticias coger y cómo gestionarlas                                     PENSARLO
 #       -> Hacer el icono con notificaciones                                                    INVESTIGAR
 #  SearchView                                                                                   OK
 #  HelpView
 #       -> No implementada                                                                      PUEDO
 #  TopNavigationMenu
 #       -> Añadir logo                                                                          ALBERTO
-#       -> Añadir notificaciones de invitaciones a grupos o cualquier otra cosa                 PENSARLO
 #  UserDetailView                                                                               OK
 #  ProfileModificationView                                                                      OK
 #  BottomNavigationMenu                                                                         OK
@@ -51,6 +43,7 @@
 #       -> Estudiar el control de activities abiertas
 #       -> Añadir la funcionalidad de postear cosas en tu propio perfil (fotos, etc)
 #       -> Hacer el script de actualización de grupos
+#       -> Cuando haya más gente, hacer la validación del acceso al grupo con la comunidad
 
 import jwt
 import json
@@ -78,6 +71,7 @@ app.config['SECRET_KEY'] = SECRET_KEY
 app.config.update(mail_settings)
 mail = Mail(app)
 
+
 ##########
 # ROUTES #
 ##########
@@ -103,6 +97,7 @@ def group_detail():
                                         request.__getattr__('json')['userId'])
         if detail['id'] is not None:
             return make_response(json.dumps(detail), 200)
+        return make_response(json.dumps(detail), 200)
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
         return make_response(json.dumps({'error': "Missing Token"}), 200)
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
@@ -112,17 +107,38 @@ def group_detail():
 @app.route('/group-create', methods=["POST"])
 def group_create():
     if interceptor.check_for_token(json.loads(request.form['body']), librarian) == 1:
-        group = librarian.group_create(json.loads(request.form['body'])['owners'],
-                                       json.loads(request.form['body'])['name'],
-                                       json.loads(request.form['body'])['description'],
-                                       float(json.loads(request.form['body'])['latitude']),
-                                       float(json.loads(request.form['body'])['longitude']),
-                                       sailor.city_from_latlng(float(json.loads(request.form['body'])['latitude']),
-                                                               float(json.loads(request.form['body'])['longitude'])),
-                                       sailor.country_from_latlng(float(json.loads(request.form['body'])['latitude']),
-                                                                  float(json.loads(request.form['body'])['longitude'])),
-                                       json.loads(request.form['body'])['phone'],
-                                       elephant, request.files['upload'])
+        if json.loads(request.form['body'])['id'] > 0:
+            group = librarian.group_modification(json.loads(request.form['body'])['name'],
+                                                 json.loads(request.form['body'])['description'],
+                                                 json.loads(request.form['body'])['frontline'],
+                                                 json.loads(request.form['body'])['students'],
+                                                 float(json.loads(request.form['body'])['latitude']),
+                                                 float(json.loads(request.form['body'])['longitude']),
+                                                 sailor.city_from_latlng(float(json.loads(request.form['body'])['latitude']),
+                                                                         float(
+                                                                             json.loads(request.form['body'])['longitude'])),
+                                                 sailor.country_from_latlng(
+                                                     float(json.loads(request.form['body'])['latitude']),
+                                                     float(json.loads(request.form['body'])['longitude'])),
+                                                 json.loads(request.form['body'])['phone'],
+                                                 json.loads(request.form['body'])['id'],
+                                                 elephant, request.files['upload'],
+                                                 json.loads(request.form['body'])['url'])
+        else:
+            group = librarian.group_create(json.loads(request.form['body'])['owners'],
+                                           json.loads(request.form['body'])['name'],
+                                           json.loads(request.form['body'])['description'],
+                                           float(json.loads(request.form['body'])['latitude']),
+                                           float(json.loads(request.form['body'])['longitude']),
+                                           sailor.city_from_latlng(float(json.loads(request.form['body'])['latitude']),
+                                                                   float(json.loads(request.form['body'])['longitude'])),
+                                           sailor.country_from_latlng(float(json.loads(request.form['body'])['latitude']),
+                                                                      float(json.loads(request.form['body'])['longitude'])),
+                                           json.loads(request.form['body'])['phone'],
+                                           elephant, request.files['upload'],
+                                           json.loads(request.form['body'])['url'],
+                                           json.loads(request.form['body'])['students'],
+                                           json.loads(request.form['body'])['frontline'])
         if group is not None:
             return make_response(json.dumps(group), 200)
         return make_response(json.dumps(group), 200)
@@ -130,6 +146,19 @@ def group_create():
     elif interceptor.check_for_token(json.loads(request.form['body']), librarian) == 2:
         return make_response(json.dumps({'error': "Missing Token"}), 200)
     elif interceptor.check_for_token(json.loads(request.form['body']), librarian) == 3:
+        return make_response(json.dumps({'error': "Invalid Token"}), 200)
+
+
+@app.route('/group-delete', methods=["POST"])
+def group_delete():
+    if interceptor.check_for_token(request.__getattr__('json'), librarian) == 1:
+        detail = librarian.group_delete(request.__getattr__('json')['objectId'],
+                                        request.__getattr__('json')['userId'])
+        if detail['ok'] is not None:
+            return make_response(json.dumps(detail), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
+        return make_response(json.dumps({'error': "Missing Token"}), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
 
@@ -152,6 +181,8 @@ def group_join():
         ok = librarian.join_group(request.__getattr__('json')['groupId'],
                                   request.__getattr__('json')['userId'],
                                   request.__getattr__('json')['roleId'])
+        if request.__getattr__('json')['roleId'] == 1 and ok['ok']:
+            send_new_owner_mail(elephant.ADMIN_MAIL, request.__getattr__('json')['userId'], request.__getattr__('json')['groupId'])
         return make_response(json.dumps(ok), 200)
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
         return make_response(json.dumps({'error': "Missing Token"}), 200)
@@ -240,8 +271,7 @@ def roda_detail():
 def roda_create():
     if interceptor.check_for_token(json.loads(request.form['body']), librarian) == 1:
         if json.loads(request.form['body'])['id'] > 0:
-            roda = librarian.roda_modification(json.loads(request.form['body'])['owners'],
-                                               json.loads(request.form['body'])['name'],
+            roda = librarian.roda_modification(json.loads(request.form['body'])['name'],
                                                json.loads(request.form['body'])['description'],
                                                json.loads(request.form['body'])['date'],
                                                json.loads(request.form['body'])['invited'],
@@ -398,28 +428,77 @@ def event_detail():
 @app.route('/event-create', methods=["POST"])
 def event_create():
     if interceptor.check_for_token(json.loads(request.form['body']), librarian) == 1:
-        event = librarian.event_create(json.loads(request.form['body'])['owners'],
-                                       json.loads(request.form['body'])['name'],
-                                       json.loads(request.form['body'])['description'],
-                                       json.loads(request.form['body'])['date'],
-                                       json.loads(request.form['body'])['invited'],
-                                       int(json.loads(request.form['body'])['platform']),
-                                       float(json.loads(request.form['body'])['latitude']) if 'latitude' in json.loads(request.form['body']) else 0.0,
-                                       float(json.loads(request.form['body'])['longitude']) if 'longitude' in json.loads(request.form['body']) else 0.0,
-                                       sailor.city_from_latlng(float(json.loads(request.form['body'])['latitude']),
-                                                               float(json.loads(request.form['body'])['longitude'])) if 'latitude' in json.loads(request.form['body']) else '',
-                                       sailor.country_from_latlng(float(json.loads(request.form['body'])['latitude']),
-                                                                  float(json.loads(request.form['body'])['longitude']))if 'latitude' in json.loads(request.form['body']) else '',
-                                       json.loads(request.form['body'])['phone'],
-                                       json.loads(request.form['body'])['convided'],
-                                       json.loads(request.form['body'])['key'],
-                                       elephant, request.files['upload'])
+        if json.loads(request.form['body'])['eventId'] > 0:
+            event = librarian.event_modification(json.loads(request.form['body'])['name'],
+                                                 json.loads(request.form['body'])['description'],
+                                                 json.loads(request.form['body'])['date'],
+                                                 json.loads(request.form['body'])['invited'],
+                                                 int(json.loads(request.form['body'])['platform']),
+                                                 float(json.loads(request.form['body'])[
+                                                         'latitude']) if 'latitude' in json.loads(
+                                                   request.form['body']) else 0.0,
+                                                 float(json.loads(request.form['body'])[
+                                                         'longitude']) if 'longitude' in json.loads(
+                                                   request.form['body']) else 0.0,
+                                                 sailor.city_from_latlng(float(json.loads(request.form['body'])['latitude']),
+                                                                         float(json.loads(request.form['body'])[
+                                                                                   'longitude'])) if 'latitude' in json.loads(
+                                                   request.form['body']) else '',
+                                                 sailor.country_from_latlng(
+                                                   float(json.loads(request.form['body'])['latitude']),
+                                                   float(json.loads(request.form['body'])[
+                                                             'longitude'])) if 'latitude' in json.loads(
+                                                   request.form['body']) else '',
+                                                 json.loads(request.form['body'])['phone'],
+                                                 json.loads(request.form['body'])['convided'],
+                                                 json.loads(request.form['body'])['key'],
+                                                 json.loads(request.form['body'])['id'],
+                                                 elephant, request.files['upload'])
+        else:
+            event = librarian.event_create(json.loads(request.form['body'])['owners'],
+                                           json.loads(request.form['body'])['name'],
+                                           json.loads(request.form['body'])['description'],
+                                           json.loads(request.form['body'])['date'],
+                                           json.loads(request.form['body'])['invited'],
+                                           int(json.loads(request.form['body'])['platform']),
+                                           float(json.loads(request.form['body'])[
+                                                     'latitude']) if 'latitude' in json.loads(
+                                               request.form['body']) else 0.0,
+                                           float(json.loads(request.form['body'])[
+                                                     'longitude']) if 'longitude' in json.loads(
+                                               request.form['body']) else 0.0,
+                                           sailor.city_from_latlng(float(json.loads(request.form['body'])['latitude']),
+                                                                   float(json.loads(request.form['body'])[
+                                                                             'longitude'])) if 'latitude' in json.loads(
+                                               request.form['body']) else '',
+                                           sailor.country_from_latlng(
+                                               float(json.loads(request.form['body'])['latitude']),
+                                               float(json.loads(request.form['body'])[
+                                                         'longitude'])) if 'latitude' in json.loads(
+                                               request.form['body']) else '',
+                                           json.loads(request.form['body'])['phone'],
+                                           json.loads(request.form['body'])['convided'],
+                                           json.loads(request.form['body'])['key'],
+                                           elephant, request.files['upload'])
         if event is not None:
             return make_response(json.dumps(event), 200)
         return make_response(json.dumps(event), 200)
     elif interceptor.check_for_token(json.loads(request.form['body']), librarian) == 2:
         return make_response(json.dumps({'error': "Missing Token"}), 200)
     elif interceptor.check_for_token(json.loads(request.form['body']), librarian) == 3:
+        return make_response(json.dumps({'error': "Invalid Token"}), 200)
+
+
+@app.route('/event-delete', methods=["POST"])
+def event_delete():
+    if interceptor.check_for_token(request.__getattr__('json'), librarian) == 1:
+        detail = librarian.event_delete(request.__getattr__('json')['objectId'],
+                                       request.__getattr__('json')['userId'])
+        if detail['ok'] is not None:
+            return make_response(json.dumps(detail), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
+        return make_response(json.dumps({'error': "Missing Token"}), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
 
@@ -606,16 +685,15 @@ def user_rated_online():
 def online_create():
     if interceptor.check_for_token(json.loads(request.form['body']), librarian) == 1:
         if json.loads(request.form['body'])['id'] > 0:
-            online = librarian.online_modification(json.loads(request.form['body'])['owners'],
-                                             json.loads(request.form['body'])['name'],
-                                             json.loads(request.form['body'])['description'],
-                                             json.loads(request.form['body'])['date'],
-                                             json.loads(request.form['body'])['invited'],
-                                             int(json.loads(request.form['body'])['platform']),
-                                             json.loads(request.form['body'])['phone'],
-                                             json.loads(request.form['body'])['key'],
-                                             json.loads(request.form['body'])['id'],
-                                             elephant, request.files['upload'])
+            online = librarian.online_modification(json.loads(request.form['body'])['name'],
+                                                   json.loads(request.form['body'])['description'],
+                                                   json.loads(request.form['body'])['date'],
+                                                   json.loads(request.form['body'])['invited'],
+                                                   int(json.loads(request.form['body'])['platform']),
+                                                   json.loads(request.form['body'])['phone'],
+                                                   json.loads(request.form['body'])['key'],
+                                                   json.loads(request.form['body'])['id'],
+                                                   elephant, request.files['upload'])
         else:
             online = librarian.online_create(json.loads(request.form['body'])['owners'],
                                              json.loads(request.form['body'])['name'],
@@ -647,9 +725,9 @@ def online_delete():
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
+
 # Users #
 #########
-
 
 @app.route('/sign-up', methods=["POST"])
 def signup_user():
@@ -666,6 +744,12 @@ def signup_user():
                                                                    user['lastName'],
                                                                    user['apelhido'],
                                                                    user['rank']), user['email'])
+    user['token'] = interceptor.create_personal_token(user['id'],
+                                                      user['email'],
+                                                      user['name'],
+                                                      user['lastName'],
+                                                      user['apelhido'],
+                                                      user['rank'])
     return make_response(json.dumps(user), 200)
 
 
@@ -777,6 +861,39 @@ def are_there_news():
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
 
+@app.route('/am-i-verified', methods=["POST"])
+def am_i_verified():
+    if interceptor.check_for_token(request.__getattr__('json'), librarian) == 1:
+        response = librarian.am_i_verified(request.__getattr__('json')['userId'])
+        return make_response(json.dumps(response), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
+        return make_response(json.dumps({'error': "Missing Token"}), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
+        return make_response(json.dumps({'error': "Invalid Token"}), 200)
+
+
+@app.route('/send-email', methods=["POST"])
+def send_email():
+    if interceptor.check_for_token(request.__getattr__('json'), librarian) == 1:
+        user = librarian.send_email(request.__getattr__('json')['type'],
+                                    request.__getattr__('json')['firstId'],
+                                    request.__getattr__('json')['secondId'])
+        if user['id'] is not None:
+            if request.__getattr__('json')['type'] == 1:
+                send_verification_mail(interceptor.create_validation_token(user['id'],
+                                                                           user['email'],
+                                                                           user['name'],
+                                                                           user['lastName'],
+                                                                           user['apelhido'],
+                                                                           user['rank']), user['email'])
+                return make_response(json.dumps({'ok': True}), 200)
+        return make_response(json.dumps({'ok': False}), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 2:
+        return make_response(json.dumps({'error': "Missing Token"}), 200)
+    elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
+        return make_response(json.dumps({'error': "Invalid Token"}), 200)
+
+
 @app.route('/news', methods=["POST"])
 def news():
     if interceptor.check_for_token(request.__getattr__('json'), librarian) == 1:
@@ -787,8 +904,6 @@ def news():
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
-# TODO hasta aquí de puta madre. Ahora, hay que ver cómo hacer el direccionamiento a la aplicación o algo de
-#  alguna manera para, o bien hacer login, o bien algo así
 @app.route('/email-verification')
 def email_verification():
     try:
@@ -804,20 +919,29 @@ def send_verification_mail(token, email):
         msg = Message(subject="Hello",
                       sender=app.config.get("MAIL_USERNAME"),
                       recipients=[email])
-        msg.body = postman.verification_body(token, elephant.APP_ROUTE)
+        msg.body, msg.html = postman.verification_mail(token, elephant.APP_ROUTE)
+        mail.send(msg)
+
+
+def send_new_owner_mail(email, new_owner_id, group_id):
+    with app.app_context():
+        msg = Message(subject="Hello",
+                      sender=app.config.get("MAIL_USERNAME"),
+                      recipients=[email])
+        msg.body = postman.new_owner_mail(new_owner_id, group_id)
         mail.send(msg)
 
 
 if __name__ == "__main__":
     # Awaking the Elephant
     elephant = Methods.Elephant()
-    # Awaking the Librarian
-    librarian = DatabaseSQLite(elephant.DB_PATH, elephant.RELATION_DISTANCE, elephant.DEFAULT_GROUP_IMAGE, elephant.DEFAULT_USER_IMAGE)
     # Awaking the Interceptor
     interceptor = Methods.Interceptor(app.config['SECRET_KEY'])
     # Awaking the Postman
     postman = Methods.Postman()
     # Awaking the Sailor
     sailor = Methods.Sailor()
+    # Awaking the Librarian
+    librarian = DatabaseSQLite(elephant.DB_PATH, elephant.RELATION_DISTANCE, elephant.DEFAULT_GROUP_IMAGE, elephant.DEFAULT_USER_IMAGE, sailor)
     # Calling the server
     app.run(port=5000, debug=False)

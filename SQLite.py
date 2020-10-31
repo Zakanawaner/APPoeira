@@ -1,13 +1,11 @@
-import geopy
 import sqlite3
 import hashlib
 from sqlite3 import Error
 from datetime import datetime
-from geopy.distance import distance, lonlat
 
 
 class DatabaseSQLite:
-    def __init__(self, db_file, relation_distance, default_group_img, default_user_img):
+    def __init__(self, db_file, relation_distance, default_group_img, default_user_img, sailor):
         super(DatabaseSQLite, self).__init__()
         self.db_file = db_file
         self.connection = None
@@ -18,9 +16,18 @@ class DatabaseSQLite:
         self.relationDistance = relation_distance
         self.default_group_image = default_group_img
         self.default_user_image = default_user_img
+        self.sailor = sailor
 
     # DATA EATER FUNCTIONS #
     ########################
+
+    # Data Eater Function: Check if a group already exists on the DB
+    def first_check(self, place_id):
+        self.open_connection()
+        self.cursor.execute("SELECT group_id FROM groups WHERE group_google_id = ?;", (place_id,))
+        group_id = self.cursor.fetchone()
+        self.close_connection()
+        return group_id is None
 
     # Data Eater Function: Check if a group already exists on the DB
     def group_check_google(self, body, city_fk, country_fk):
@@ -326,9 +333,7 @@ class DatabaseSQLite:
                               "votes": len(ratings) if ratings is not None else 0,
                               'latitude': list(result)[5],
                               'longitude': list(result)[6],
-                              "distance": float('%.1f' % geopy.distance.distance(lonlat(*[latitude, longitude]),
-                                                                                 (lonlat(list(result)[5],
-                                                                                         list(result)[6]))).km)
+                              "distance": float('%.1f' % self.sailor.geodesic_distance(latitude, longitude, list(result)[5], list(result)[6])) if list(result)[5] is not None else 0.0
                               }
                 groups.append(dictionary)
             self.close_connection()
@@ -388,9 +393,7 @@ class DatabaseSQLite:
                                "verified": False if list(roda)[4] == 0 else True,
                                'latitude': list(roda)[5],
                                'longitude': list(roda)[6],
-                               "distance": float('%.1f' % geopy.distance.distance(lonlat(*[latitude, longitude]),
-                                                                                  (lonlat(list(roda)[5],
-                                                                                          list(roda)[6]))).km),
+                               "distance": float('%.1f' % self.sailor.geodesic_distance(latitude, longitude, list(roda)[5], list(roda)[6])) if list(roda)[5] is not None else 0.0,
                                'ownerApelhido': list(owner)[1],
                                'ownerRank': list(owner)[2],
                                'rating': statistics.mean(ratings) if ratings is not None else 0.0
@@ -493,8 +496,92 @@ class DatabaseSQLite:
         return {"ok": None,
                 }
 
+    # APPoeira Function: Deletes a Group from the DB. Function called when /group-delete invoked
+    def group_delete(self, group_id, owner_id, ):
+        self.open_connection()
+        self.cursor.execute("SELECT u_g_user_id "
+                            "FROM user_group "
+                            "WHERE u_g_group_id = ? "
+                            "AND u_g_role_id = 1;",
+                            (group_id,))
+        user_id = self.cursor.fetchone()
+        if user_id[0] == owner_id:
+            response = self.cursor.execute("UPDATE groups SET "
+                                           "group_deleted = 1 "
+                                           "WHERE group_id = ?;",
+                                           (group_id,))
+            if response.rowcount > 0:
+                self.close_connection()
+                return {"ok": True,
+                        }
+        self.close_connection()
+        return {"ok": None,
+                }
+
+    # APPoeira Function: Inserts a new Group on the DB. Function called when /group-created invoked
+    def group_modification(self, name, description, frontline, students, latitude, longitude, city, country, phone,
+                           group_id, elephant, image, url):
+        self.open_connection()
+        self.cursor.execute("SELECT city_id FROM cities WHERE city_name = ?;", (city,))
+        city_id = self.cursor.fetchone()
+        self.cursor.execute("SELECT country_id FROM countries WHERE country_name = ?;", (country,))
+        country_id = self.cursor.fetchone()
+        picture_url, ok, pic_name = elephant.upload_object(image, group_id)
+        response = self.cursor.execute("UPDATE groups "
+                                       "SET "
+                                       "group_name = ?, "
+                                       "group_description = ?, "
+                                       "group_url = ?, "
+                                       "group_verified = ?, "
+                                       "group_latitude = ?, "
+                                       "group_longitude = ?, "
+                                       "group_location = ?, "
+                                       "group_city_id = ?, "
+                                       "group_country_id = ?, "
+                                       "group_phone = ?, "
+                                       "group_picture_url = ? "
+                                       "WHERE group_id = ?;",
+                                       (name, description, url, True, latitude, longitude, str(latitude) + " " + str(longitude), city_id[0],
+                                        country_id[0], phone, picture_url if picture_url != "" else self.default_group_image,
+                                        group_id))
+        if response.rowcount > 0:
+            self.cursor.execute("DELETE FROM user_group "
+                                "WHERE u_g_group_id = ? "
+                                "AND u_g_role_id = 2;",
+                                (group_id,))
+            frontlines = [(user_frontline, group_id, 2, datetime.utcnow(), False) for user_frontline in frontline]
+            self.cursor.executemany("INSERT INTO user_group ("
+                                    "u_g_user_id, "
+                                    "u_g_group_id, "
+                                    "u_g_role_id, "
+                                    "u_g_date, "
+                                    "u_g_accepted"
+                                    ") "
+                                    "VALUES (?,?,?,?,?)",
+                                    (frontlines))
+            self.cursor.execute("DELETE FROM user_group "
+                                "WHERE u_g_group_id = ? "
+                                "AND u_g_role_id = 3;",
+                                (group_id,))
+            students_ = [(user_student, group_id, 3, datetime.utcnow(), False) for user_student in students]
+            self.cursor.executemany("INSERT INTO user_group ("
+                                    "u_g_user_id, "
+                                    "u_g_group_id, "
+                                    "u_g_role_id, "
+                                    "u_g_date, "
+                                    "u_g_accepted"
+                                    ") "
+                                    "VALUES (?,?,?,?,?)",
+                                    (students_))
+            self.close_connection()
+            return {"id": group_id,
+                    }
+        self.close_connection()
+        return {"id": None,
+                }
+
     # APPoeira Function: Inserts a new Roda on the DB. Function called when /roda-created invoked
-    def roda_modification(self, owners, name, description, date, invited, latitude, longitude, city, country, phone, roda_id, elephant, image):
+    def roda_modification(self, name, description, date, invited, latitude, longitude, city, country, phone, roda_id, elephant, image):
         self.open_connection()
         self.cursor.execute("SELECT city_id FROM cities WHERE city_name = ?;", (city,))
         city_id = self.cursor.fetchone()
@@ -539,7 +626,7 @@ class DatabaseSQLite:
                 }
 
     # APPoeira Function: Inserts a new Online on the DB. Function called when /online-created invoked
-    def online_modification(self, owners, name, description, date, invited, platform, phone, key, online_id, elephant, image):
+    def online_modification(self, name, description, date, invited, platform, phone, key, online_id, elephant, image):
         self.open_connection()
         url, ok, pic_name = elephant.upload_object(image, online_id)
         response = self.cursor.execute("UPDATE onlines "
@@ -767,7 +854,7 @@ class DatabaseSQLite:
                 result.append({"id": list(event)[0],
                                "name": list(event)[1],
                                "date": list(event)[2].split('-')[0] + '-' +
-                                       list(event)[2].split('-')[1] + '-' +
+                                       str(int(list(event)[2].split('-')[1]) + 1) + '-' +
                                        list(event)[2].split('-')[2] + ' ' +
                                        list(event)[2].split('-')[3] + ':' +
                                        list(event)[2].split('-')[4],
@@ -775,9 +862,7 @@ class DatabaseSQLite:
                                "verified": False if list(event)[4] == 0 else True,
                                'latitude': list(event)[5],
                                'longitude': list(event)[6],
-                               "distance": float('%.1f' % geopy.distance.distance(lonlat(*[latitude, longitude]),
-                                                                                  (lonlat(list(event)[5],
-                                                                                          list(event)[6]))).km),
+                               "distance": float('%.1f' % self.sailor.geodesic_distance(latitude, longitude, list(event)[5], list(event)[6])) if list(event)[5] is not None else 0.0,
                                'ownerApelhido': list(owner)[1],
                                'ownerRank': list(owner)[2],
                                'platform': list(platform)[0],
@@ -1005,6 +1090,105 @@ class DatabaseSQLite:
         return {"id": None,
                 }
 
+    # APPoeira Function: Deletes a Roda from the DB. Function called when /roda-delete invoked
+    def event_delete(self, event_id, owner_id, ):
+        self.open_connection()
+        self.cursor.execute("SELECT u_e_user_id "
+                            "FROM user_event "
+                            "WHERE u_e_event_id = ? "
+                            "AND u_e_role_id = 1;",
+                            (event_id,))
+        user_id = self.cursor.fetchone()
+        if user_id[0] == owner_id:
+            response = self.cursor.execute("UPDATE events SET "
+                                           "event_deleted = 1 "
+                                           "WHERE event_id = ?;",
+                                           (event_id,))
+            if response.rowcount > 0:
+                self.close_connection()
+                return {"ok": True,
+                        }
+        self.close_connection()
+        return {"ok": None,
+                }
+
+    # APPoeira Function: Modifies an Event on the DB. Function called when /event-created invoked
+    def event_modification(self, name, description, date, invited, platform, latitude, longitude, city,
+                           country, phone, convided, key, event_id, elephant, image):
+        self.open_connection()
+        url, ok, pic_name = elephant.upload_object(image, event_id)
+        if platform == 6:
+            self.cursor.execute("SELECT city_id FROM cities WHERE city_name = ?;", (city,))
+            city_id = self.cursor.fetchone()
+            self.cursor.execute("SELECT country_id FROM countries WHERE country_name = ?;", (country,))
+            country_id = self.cursor.fetchone()
+            response = self.cursor.execute("UPDATE events "
+                                           "SET "
+                                           "event_name = ?, "
+                                           "event_date = ?, "
+                                           "event_pic_url = ?"
+                                           "event_description = ?, "
+                                           "event_verified = ?, "
+                                           "event_latitude = ?, "
+                                           "event_longitude = ?, "
+                                           "event_city_id = ?, "
+                                           "event_country_id = ?, "
+                                           "event_phone = ? "
+                                           "WHERE event_id = ?;",
+                                           (name, date, url if url != "" else self.default_group_image,
+                                            description, True, latitude, longitude, city_id[0],
+                                            country_id[0], phone, event_id))
+        else:
+            response = self.cursor.execute("UPDATE events "
+                                           "SET "
+                                           "event_name = ?, "
+                                           "event_date = ?, "
+                                           "event_pic_url = ?"
+                                           "event_description = ?, "
+                                           "event_verified = ?, "
+                                           "event_phone = ? "
+                                           "WHERE event_id = ?;",
+                                           (name, date, url if url != "" else self.default_group_image,
+                                            description, True, phone, event_id))
+        if response.rowcount > 0:
+            self.cursor.execute("INSERT INTO event_platform ("
+                                "e_p_event_id, "
+                                "e_p_platform_id, "
+                                "e_p_key"
+                                ") "
+                                "VALUES (?,?,?)",
+                                (event_id, platform, key))
+            self.cursor.execute("DELETE FROM user_event "
+                                "WHERE u_e_event_id = ? "
+                                "AND u_e_role_id = 2;",
+                                (event_id,))
+            inviteds = [(user_invited, event_id, 2, datetime.utcnow(), False) for user_invited in invited]
+            self.cursor.executemany("INSERT INTO user_event ("
+                                    "u_e_user_id, "
+                                    "u_e_event_id, "
+                                    "u_e_role_id, "
+                                    "u_e_date, "
+                                    "u_e_accepted"
+                                    ") "
+                                    "VALUES (?,?,?,?,?)",
+                                    (inviteds))
+            convideds = [(user_convided, event_id, 3, datetime.utcnow(), False) for user_convided in convided]
+            self.cursor.executemany("INSERT INTO user_event ("
+                                    "u_e_user_id, "
+                                    "u_e_event_id, "
+                                    "u_e_role_id, "
+                                    "u_e_date, "
+                                    "u_e_accepted"
+                                    ") "
+                                    "VALUES (?,?,?,?,?)",
+                                    (convideds))
+            self.close_connection()
+            return {"id": event_id[0],
+                    }
+        self.close_connection()
+        return {"id": None,
+                }
+
     # APPoeira Function: Inserts a new Online on the DB. Function called when /online-created invoked
     def online_create(self, owners, name, description, date, invited, platform, phone, key, elephant, image):
         self.open_connection()
@@ -1142,7 +1326,7 @@ class DatabaseSQLite:
                             "user_email_verified, "
                             "user_email "
                             "FROM users "
-                            "WHERE user_email = ? AND user_password = ?"
+                            "WHERE user_email = ? AND user_password = ? "
                             "AND user_deleted = 0;",
                             (email, crypt.hexdigest()))
         user = self.cursor.fetchone()
@@ -1238,6 +1422,14 @@ class DatabaseSQLite:
                                 "AND group_id = ?;",
                                 (user_id, group_id))
             comment = self.cursor.fetchall()
+            self.cursor.execute("SELECT group_id "
+                                "FROM groups "
+                                "INNER JOIN user_group ON group_id = u_g_group_id "
+                                "INNER JOIN users ON u_g_user_id = user_id AND u_g_role_id = 1 "
+                                "WHERE user_id = ? "
+                                "AND group_id = ?;",
+                                (user_id, group_id))
+            owner = self.cursor.fetchall()
             self.close_connection()
             return {"error": '',
                     "id": list(group)[0],
@@ -1259,10 +1451,11 @@ class DatabaseSQLite:
                     "longitude": list(group)[14],
                     "isMember": True if member != [] else False,
                     "hasVoted": vote[0][0] if vote != [] else 0,
-                    "comment": comment[0][0] if comment != [] else None
+                    "comment": comment[0][0] if comment != [] else None,
+                    "isOwner": True if owner != [] else False
                     }
         self.close_connection()
-        return {"error": 'Wrong User',
+        return {"error": 'Wrong Group',
                 "id": None,
                 "name": None,
                 "picUrl": None,
@@ -1282,11 +1475,12 @@ class DatabaseSQLite:
                 "longitude": None,
                 "isMember": None,
                 "hasVoted": None,
-                "comment": None
+                "comment": None,
+                "isOwner": None,
                 }
 
     # APPoeira Function: Inserts a new Group on the DB. Function called when /group-created invoked
-    def group_create(self, owners, name, description, latitude, longitude, city, country, phone, elephant, image):
+    def group_create(self, owners, name, description, latitude, longitude, city, country, phone, elephant, image, url, students, frontline):
         self.open_connection()
         self.cursor.execute("SELECT city_id FROM cities WHERE city_name = ?;", (city,))
         city_id = self.cursor.fetchone()
@@ -1298,14 +1492,16 @@ class DatabaseSQLite:
                                        "group_verified, "
                                        "group_latitude, "
                                        "group_longitude, "
+                                       "group_location, "
                                        "group_city_id, "
                                        "group_country_id, "
                                        "group_phone, "
-                                       "group_deleted"
+                                       "group_deleted, "
+                                       "group_url"
                                        ") "
-                                       "VALUES (?,?,?,?,?,?,?,?,?);",
-                                       (name, description, True, latitude, longitude, city_id[0],
-                                        country_id[0], phone, False))
+                                       "VALUES (?,?,?,?,?,?,?,?,?,?,?);",
+                                       (name, description, True, latitude, longitude, str(latitude) + " " + str(longitude), city_id[0],
+                                        country_id[0], phone, False, url))
         if response.rowcount > 0:
             self.cursor.execute("SELECT group_id "
                                 "FROM groups "
@@ -1314,11 +1510,11 @@ class DatabaseSQLite:
                                 (latitude, longitude))
             group_id = self.cursor.fetchone()
             if group_id is not None:
-                url, ok, pic_name = elephant.upload_object(image, group_id[0])
+                picture_url, ok, pic_name = elephant.upload_object(image, group_id[0])
                 self.cursor.execute("UPDATE groups SET "
                                     "group_picture_url = ? "
                                     "WHERE group_id = ?;",
-                                    (url if url != "" else self.default_group_image, group_id[0]))
+                                    (picture_url if picture_url != "" else self.default_group_image, group_id[0]))
                 self.cursor.execute("INSERT INTO user_group ("
                                     "u_g_user_id, "
                                     "u_g_group_id, "
@@ -1328,6 +1524,26 @@ class DatabaseSQLite:
                                     ") "
                                     "VALUES (?,?,?,?,?)",
                                     (owners[0], group_id[0], 1, True, datetime.utcnow()))
+                frontlines = [(user_frontline, group_id, 2, datetime.utcnow(), False) for user_frontline in frontline]
+                self.cursor.executemany("INSERT INTO user_group ("
+                                        "u_g_user_id, "
+                                        "u_g_group_id, "
+                                        "u_g_role_id, "
+                                        "u_g_date, "
+                                        "u_g_accepted"
+                                        ") "
+                                        "VALUES (?,?,?,?,?)",
+                                        (frontlines))
+                students_ = [(user_student, group_id, 3, datetime.utcnow(), False) for user_student in students]
+                self.cursor.executemany("INSERT INTO user_group ("
+                                        "u_g_user_id, "
+                                        "u_g_group_id, "
+                                        "u_g_role_id, "
+                                        "u_g_date, "
+                                        "u_g_accepted"
+                                        ") "
+                                        "VALUES (?,?,?,?,?)",
+                                        (students_))
                 self.close_connection()
                 return {"id": group_id[0],
                         }
@@ -2854,8 +3070,53 @@ class DatabaseSQLite:
         self.close_connection()
         return {'ok': True if response.rowcount > 0 else False}
 
+    # APPoeira Function: send email. Called when /send-email invoked
+    def send_email(self, type_mail, user_id, object_id):
+        self.open_connection()
+        if type_mail == 1:
+            self.cursor.execute("SELECT user_id, "
+                                "user_email, "
+                                "user_first_name, "
+                                "user_last_name, "
+                                "user_apelhido, "
+                                "user_rank_id "
+                                "FROM users "
+                                "WHERE user_id = ?;",
+                                (user_id,))
+            user = list(self.cursor.fetchone())
+            self.close_connection()
+            if user is not None:
+                return {'id': user[0],
+                        'email': user[1],
+                        'name': user[2],
+                        'lastName': user[3],
+                        'apelhido': user[4],
+                        'rank': user[5]
+                        }
+        self.close_connection()
+        return {'id': None,
+                'email': None,
+                'name': None,
+                'lastName': None,
+                'apelhido': None,
+                'rank': None
+                }
+
     # COMMON FUNCTIONS #
     ########################
+
+    # APPoeira Function: check email verification. Called when /am-i-verified invoked
+    def am_i_verified(self, user_id):
+        self.open_connection()
+        self.cursor.execute("SELECT user_email_verified "
+                            "FROM users "
+                            "WHERE user_id = ?;",
+                            (user_id,))
+        verified = list(self.cursor.fetchone())
+        self.close_connection()
+        if verified is not None:
+            return {'response': True if verified[0] == 1 else False}
+        return {'response': None}
 
     # Common Function: Check token information once the token is valid
     def check_token_info(self, user_data):

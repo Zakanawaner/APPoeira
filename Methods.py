@@ -7,6 +7,7 @@ import requests
 import phonenumbers
 import boto3
 from SQLite import DatabaseSQLite
+from math import sin, cos, sqrt, atan2, radians
 
 
 # Interceptor is in charge of the security. From token to sanitize inputs
@@ -52,6 +53,8 @@ class Elephant:
     def __init__(self):
         # APP constants
         self.APP_ROUTE = 'https://234bf21550ef.ngrok.io'
+        # Mail Constants
+        self.ADMIN_MAIL = 'appoeira.onethousandprojects@gmail.com'
         # Snoopy constants
         self.FACEBOOK_TOKEN = 'EAAEd3h8ryTIBAIysNjY7gfk2E0dGnvnAfspf3FHNSIeAl8xQc2Awq3LLDc2cPeWke3lffIsN2FvtJSpHd6cF9LxDIYvGvvLgI1qRLfhQNL55bilVt4AxjJKZAYUpOZBqLxIZBiuHTwdDUuWtkh612108PaTOj7V4d7KUMmInUji0fPxu7mBgbewolJ1NVox2S4jDRaKQgZDZD'
         self.GOOGLE_MAPS_KEY = 'AIzaSyATucbLXuXUMgYmynDqjy9qiY1Egz1Dh-o'
@@ -62,6 +65,9 @@ class Elephant:
         self.RELATION_DISTANCE = 0.009009009
         self.DEFAULT_GROUP_IMAGE = 'https://image.flaticon.com/icons/png/512/33/33887.png'
         self.DEFAULT_USER_IMAGE = 'https://image.flaticon.com/icons/png/512/928/928642.png'
+        # AWS configuration
+        self.AWS_GENERAL_KEY_ID = 'AKIAJFUZL44WQT476OTQ'
+        self.AWS_GENERAL_KEY_SECRET = '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'
         # AWS S3 configuration
         self.REGION_NAME = 'eu-west-2'
         self.BUCKET_NAME = 'appoeira'
@@ -91,6 +97,7 @@ class Elephant:
 class Sailor:
     def __init__(self):
         self.locator = geopy.geocoders.Nominatim(user_agent='Sailor')
+        self.earth_radius = 6373.0
 
     def country_from_latlng(self, latitude, longitude):
         return self.locator.reverse(str(latitude) + ',' + str(longitude), language='en').raw['address']['country']
@@ -109,6 +116,20 @@ class Sailor:
     def full_address_from_latlng(self, latitude, longitude):
         return ', '.join(self.locator.reverse(str(latitude) + ',' + str(longitude), language='en').address.split(',')[0:2])
 
+    def geodesic_distance(self, lat1, lng1, lat2, lng2):
+        lat1 = radians(lat1)
+        lng1 = radians(lng1)
+        lat2 = radians(lat2)
+        lng2 = radians(lng2)
+
+        d_lng = lng2 - lng1
+        d_lat = lat2 - lat1
+
+        a = sin(d_lat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(d_lng / 2) ** 2
+        c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+        return self.earth_radius * c
+
 
 # Postman handles all the mail that is implemented in the application
 class Postman:
@@ -123,56 +144,30 @@ class Postman:
             "MAIL_PASSWORD": 'uhjltusxkzycmrji'
         }
         self.VERIFICATION_BODY = 'Hi! How are you? Here is the link you wanted.\n{}/email-verification?token={}'
+        self.NEW_OWNER_BODY = 'El usuario con id {} se ha unido al grupo con id {}'
+        with open('./Templates/email_verification.html', 'r') as template:
+            self.VERIFICATION_HTML = template.read()
+        with open('./Templates/email_verified.html', 'r') as template:
+            self.VERIFICATION_OK_HTML = template.read()
+        with open('./Templates/email_not_verified.html', 'r') as template:
+            self.VERIFICATION_NOK_HTML = template.read()
+        with open('./Templates/email_invalid_token.html', 'r') as template:
+            self.VERIFICATION_BAD_HTML = template.read()
 
     def html_email_verification(self, mode):
         self.mode = mode
         if self.mode == 1:
-            return '''
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>APPoeira: Email no verificado</title>
-                </head>
-                    <body>
-                        <h2>Hola, {}.</h2>
-                        <p>¡¡Tu email ha sido verificado!!</p>
-                    </body>
-                </html>
-                '''
+            return self.VERIFICATION_OK_HTML
         elif self.mode == 2:
-            return '''
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>APPoeira: Email no verificado</title>
-                </head>
-                    <body>
-                        <h2>Hola, {}.</h2>
-                        <p>Hubo un error en la verificación de tu email.</p> 
-                        <p>Puedes solicitar de nuevo que te enviemos el email de verificaición entrando en APPoeira</p>
-                    </body>
-                </html>
-                '''
+            return self.VERIFICATION_NOK_HTML
         elif self.mode == 3:
-            return '''
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>APPoeira: Email no verificado</title>
-                </head>
-                    <body>
-                        <h2>Hola</h2>
-                        <p>El link no era correcto.</p> 
-                        <p>Puedes solicitar de nuevo que te enviemos el email de verificaición entrando en APPoeira</p>
-                    </body>
-                </html>
-                '''
+            return self.VERIFICATION_BAD_HTML
 
-    def verification_body(self, token, route):
-        return self.VERIFICATION_BODY.format(route, token)
+    def verification_mail(self, token, route):
+        return self.VERIFICATION_BODY.format(route, token), self.VERIFICATION_HTML.format(route, token)
+
+    def new_owner_mail(self, new_owner_id, group_id):
+        return self.NEW_OWNER_BODY.format(new_owner_id, group_id)
 
 
 # Snoopy is the one that gets the data from the cloud
@@ -182,7 +177,7 @@ class Snoopy:
         self.facebookSnoopy = facebook.GraphAPI(access_token=facebook_token)
         self.googleMapsKey = google_maps_key
         self.geoCoder = geopy.geocoders.Nominatim(user_agent='snoopy')
-        self.database = DatabaseSQLite(elephant.DB_PATH, elephant.RELATION_DISTANCE, elephant.DEFAULT_GROUP_IMAGE, elephant.DEFAULT_USER_IMAGE)  # Database()
+        self.database = DatabaseSQLite(elephant.DB_PATH, elephant.RELATION_DISTANCE, elephant.DEFAULT_GROUP_IMAGE, elephant.DEFAULT_USER_IMAGE, Sailor())  # Database()
 
     def get_city_from_lat_lng(self, latitude, longitude):
         # Function that returns the address from a lat long.

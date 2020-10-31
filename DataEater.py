@@ -8,9 +8,10 @@ INSTAGRAM_TOKEN = 'IGQVJXVVNjbDZALYjZAtYlpyaDA5VS1vSXVLSUFFdVc5VWlieDFadl9UdW9yU
 
 def data_eater_groups():
     # We look on google places
+    import time
     reader = open("./Source/worldcities.csv").read().split('\n')
     reader.pop(0)
-    reader = reader[4715:]
+    reader = reader[13373:]
     for city in reader:
         print(city)
         city = city.replace('"', '').split(',')
@@ -18,8 +19,9 @@ def data_eater_groups():
         country_id = snoopy.database.country_check(city[4])
         go = snoopy.get_go_nearby(latitude=float(city[2]), longitude=float(city[3]), distance=50000, query='capoeira')['results']
         for group in go:
-            group = snoopy.make_google_pretty(group)
-            snoopy.database.group_check_google(group, city_id, country_id)
+            if snoopy.database.first_check(group['place_id']):
+                group = snoopy.make_google_pretty(group)
+                snoopy.database.group_check_google(group, city_id, country_id)
         #fb = snoopy.get_fb_nearby(latitude=float(city[2]), longitude=float(city[3]), distance=50000, limit=100, query='capoeira')['data']
         #for group in fb:
         #    snoopy.make_facebook_pretty(group, city)
