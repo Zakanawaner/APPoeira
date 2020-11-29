@@ -5,7 +5,7 @@ from datetime import datetime
 
 
 class DatabaseSQLite:
-    def __init__(self, db_file, relation_distance, default_group_img, default_user_img, sailor):
+    def __init__(self, db_file, relation_distance, default_group_img, default_roda_img, default_event_img, default_online_img, default_user_img, sailor):
         super(DatabaseSQLite, self).__init__()
         self.db_file = db_file
         self.connection = None
@@ -15,6 +15,9 @@ class DatabaseSQLite:
         self.close_connection()
         self.relationDistance = relation_distance
         self.default_group_image = default_group_img
+        self.default_roda_image = default_roda_img
+        self.default_event_image = default_event_img
+        self.default_online_image = default_online_img
         self.default_user_image = default_user_img
         self.sailor = sailor
 
@@ -447,25 +450,27 @@ class DatabaseSQLite:
                 self.cursor.execute("UPDATE rodas SET "
                                     "roda_pic_url = ? "
                                     "WHERE roda_id = ?;",
-                                    (url if url != "" else self.default_group_image, roda_id[0]))
+                                    (url if url != "" else self.default_roda_image, roda_id[0]))
                 self.cursor.execute("INSERT INTO user_roda ("
                                     "u_r_user_id, "
                                     "u_r_roda_id, "
                                     "u_r_role_id, "
                                     "u_r_accepted, "
-                                    "u_r_date "
+                                    "u_r_date, "
+                                    "u_r_ack"
                                     ") "
-                                    "VALUES (?,?,?,?,?)",
-                                    (owners[0], roda_id[0], 1, True, datetime.utcnow()))
-                inviteds = [(user_invited, roda_id[0], 2, datetime.utcnow(), False) for user_invited in invited]
+                                    "VALUES (?,?,?,?,?,?)",
+                                    (owners[0], roda_id[0], 1, True, datetime.utcnow(), True))
+                inviteds = [(user_invited, roda_id[0], 2, datetime.utcnow(), False, True) for user_invited in invited]
                 self.cursor.executemany("INSERT INTO user_roda ("
                                         "u_r_user_id, "
                                         "u_r_roda_id, "
                                         "u_r_role_id, "
                                         "u_r_date, "
-                                        "u_r_accepted"
+                                        "u_r_accepted, "
+                                        "u_r_ack"
                                         ") "
-                                        "VALUES (?,?,?,?,?)",
+                                        "VALUES (?,?,?,?,?,?)",
                                         (inviteds))
                 self.close_connection()
                 return {"id": roda_id[0],
@@ -549,29 +554,31 @@ class DatabaseSQLite:
                                 "WHERE u_g_group_id = ? "
                                 "AND u_g_role_id = 2;",
                                 (group_id,))
-            frontlines = [(user_frontline, group_id, 2, datetime.utcnow(), False) for user_frontline in frontline]
+            frontlines = [(user_frontline, group_id, 2, datetime.utcnow(), False, True) for user_frontline in frontline]
             self.cursor.executemany("INSERT INTO user_group ("
                                     "u_g_user_id, "
                                     "u_g_group_id, "
                                     "u_g_role_id, "
                                     "u_g_date, "
-                                    "u_g_accepted"
+                                    "u_g_accepted, "
+                                    "u_g_ack "
                                     ") "
-                                    "VALUES (?,?,?,?,?)",
+                                    "VALUES (?,?,?,?,?,?)",
                                     (frontlines))
             self.cursor.execute("DELETE FROM user_group "
                                 "WHERE u_g_group_id = ? "
                                 "AND u_g_role_id = 3;",
                                 (group_id,))
-            students_ = [(user_student, group_id, 3, datetime.utcnow(), False) for user_student in students]
+            students_ = [(user_student, group_id, 3, datetime.utcnow(), False, True) for user_student in students]
             self.cursor.executemany("INSERT INTO user_group ("
                                     "u_g_user_id, "
                                     "u_g_group_id, "
                                     "u_g_role_id, "
                                     "u_g_date, "
-                                    "u_g_accepted"
+                                    "u_g_accepted, "
+                                    "u_g_ack"
                                     ") "
-                                    "VALUES (?,?,?,?,?)",
+                                    "VALUES (?,?,?,?,?,?)",
                                     (students_))
             self.close_connection()
             return {"id": group_id,
@@ -602,21 +609,22 @@ class DatabaseSQLite:
                                        "roda_pic_url = ? "
                                        "WHERE roda_id = ?;",
                                        (name, date, description, True, latitude, longitude, city_id[0],
-                                        country_id[0], phone, url if url != "" else self.default_group_image, roda_id))
+                                        country_id[0], phone, url if url != "" else self.default_roda_image, roda_id))
         if response.rowcount > 0:
             self.cursor.execute("DELETE FROM user_roda "
                                 "WHERE u_r_roda_id = ? "
                                 "AND u_r_role_id = 2;",
                                 (roda_id,))
-            inviteds = [(user_invited, roda_id, 2, datetime.utcnow(), False) for user_invited in invited]
+            inviteds = [(user_invited, roda_id, 2, datetime.utcnow(), False, True) for user_invited in invited]
             self.cursor.executemany("INSERT INTO user_roda ("
                                     "u_r_user_id, "
                                     "u_r_roda_id, "
                                     "u_r_role_id, "
                                     "u_r_date, "
-                                    "u_r_accepted"
+                                    "u_r_accepted, "
+                                    "u_t_ack"
                                     ") "
-                                    "VALUES (?,?,?,?,?)",
+                                    "VALUES (?,?,?,?,?,?)",
                                     (inviteds))
             self.close_connection()
             return {"id": roda_id,
@@ -638,21 +646,22 @@ class DatabaseSQLite:
                                        "online_phone = ?, "
                                        "online_pic_url = ? "
                                        "WHERE online_id = ?;",
-                                       (name, date, description, True, phone, url if url != "" else self.default_group_image, online_id))
+                                       (name, date, description, True, phone, url if url != "" else self.default_online_image, online_id))
         if response.rowcount > 0:
             self.cursor.execute("DELETE FROM user_online "
                                 "WHERE u_o_online_id = ? "
                                 "AND u_o_role_id = 2;",
                                 (online_id,))
-            inviteds = [(user_invited, online_id, 2, datetime.utcnow(), False) for user_invited in invited]
+            inviteds = [(user_invited, online_id, 2, datetime.utcnow(), False, True) for user_invited in invited]
             self.cursor.executemany("INSERT INTO user_online ("
                                     "u_o_user_id, "
                                     "u_o_online_id, "
                                     "u_o_role_id, "
                                     "u_o_date, "
-                                    "u_o_accepted"
+                                    "u_o_accepted, "
+                                    "u_o_ack"
                                     ") "
-                                    "VALUES (?,?,?,?,?);",
+                                    "VALUES (?,?,?,?,?,?);",
                                     (inviteds))
             self.cursor.execute("UPDATE online_platform "
                                 "SET "
@@ -1046,7 +1055,7 @@ class DatabaseSQLite:
                 self.cursor.execute("UPDATE events SET "
                                     "event_pic_url = ? "
                                     "WHERE event_id = ?;",
-                                    (url if url != "" else self.default_group_image, event_id[0]))
+                                    (url if url != "" else self.default_event_image, event_id[0]))
                 self.cursor.execute("INSERT INTO event_platform ("
                                     "e_p_event_id, "
                                     "e_p_platform_id, "
@@ -1059,29 +1068,32 @@ class DatabaseSQLite:
                                     "u_e_event_id, "
                                     "u_e_role_id, "
                                     "u_e_date, "
-                                    "u_e_accepted"
+                                    "u_e_accepted, "
+                                    "u_e_ack"
                                     ") "
-                                    "VALUES (?,?,?,?,?)",
-                                    (owners[0], event_id[0], 1, datetime.utcnow(), True))
-                inviteds = [(user_invited, event_id[0], 2, datetime.utcnow(), False) for user_invited in invited]
+                                    "VALUES (?,?,?,?,?,?)",
+                                    (owners[0], event_id[0], 1, datetime.utcnow(), True, True))
+                inviteds = [(user_invited, event_id[0], 2, datetime.utcnow(), False, True) for user_invited in invited]
                 self.cursor.executemany("INSERT INTO user_event ("
                                         "u_e_user_id, "
                                         "u_e_event_id, "
                                         "u_e_role_id, "
                                         "u_e_date, "
-                                        "u_e_accepted"
+                                        "u_e_accepted, "
+                                        "u_e_ack"
                                         ") "
-                                        "VALUES (?,?,?,?,?)",
+                                        "VALUES (?,?,?,?,?,?)",
                                         (inviteds))
-                convideds = [(user_convided, event_id[0], 3, datetime.utcnow(), False) for user_convided in convided]
+                convideds = [(user_convided, event_id[0], 3, datetime.utcnow(), False, True) for user_convided in convided]
                 self.cursor.executemany("INSERT INTO user_event ("
                                         "u_e_user_id, "
                                         "u_e_event_id, "
                                         "u_e_role_id, "
                                         "u_e_date, "
-                                        "u_e_accepted"
+                                        "u_e_accepted, "
+                                        "u_e_ack"
                                         ") "
-                                        "VALUES (?,?,?,?,?)",
+                                        "VALUES (?,?,?,?,?,?)",
                                         (convideds))
                 self.close_connection()
                 return {"id": event_id[0],
@@ -1135,7 +1147,7 @@ class DatabaseSQLite:
                                            "event_country_id = ?, "
                                            "event_phone = ? "
                                            "WHERE event_id = ?;",
-                                           (name, date, url if url != "" else self.default_group_image,
+                                           (name, date, url if url != "" else self.default_event_image,
                                             description, True, latitude, longitude, city_id[0],
                                             country_id[0], phone, event_id))
         else:
@@ -1148,7 +1160,7 @@ class DatabaseSQLite:
                                            "event_verified = ?, "
                                            "event_phone = ? "
                                            "WHERE event_id = ?;",
-                                           (name, date, url if url != "" else self.default_group_image,
+                                           (name, date, url if url != "" else self.default_event_image,
                                             description, True, phone, event_id))
         if response.rowcount > 0:
             self.cursor.execute("INSERT INTO event_platform ("
@@ -1162,25 +1174,27 @@ class DatabaseSQLite:
                                 "WHERE u_e_event_id = ? "
                                 "AND u_e_role_id = 2;",
                                 (event_id,))
-            inviteds = [(user_invited, event_id, 2, datetime.utcnow(), False) for user_invited in invited]
+            inviteds = [(user_invited, event_id, 2, datetime.utcnow(), False, True) for user_invited in invited]
             self.cursor.executemany("INSERT INTO user_event ("
                                     "u_e_user_id, "
                                     "u_e_event_id, "
                                     "u_e_role_id, "
                                     "u_e_date, "
-                                    "u_e_accepted"
+                                    "u_e_accepted, "
+                                    "u_e_ack"
                                     ") "
-                                    "VALUES (?,?,?,?,?)",
+                                    "VALUES (?,?,?,?,?,?)",
                                     (inviteds))
-            convideds = [(user_convided, event_id, 3, datetime.utcnow(), False) for user_convided in convided]
+            convideds = [(user_convided, event_id, 3, datetime.utcnow(), False, True) for user_convided in convided]
             self.cursor.executemany("INSERT INTO user_event ("
                                     "u_e_user_id, "
                                     "u_e_event_id, "
                                     "u_e_role_id, "
                                     "u_e_date, "
-                                    "u_e_accepted"
+                                    "u_e_accepted, "
+                                    "u_e_ack"
                                     ") "
-                                    "VALUES (?,?,?,?,?)",
+                                    "VALUES (?,?,?,?,?,?)",
                                     (convideds))
             self.close_connection()
             return {"id": event_id[0],
@@ -1214,7 +1228,7 @@ class DatabaseSQLite:
                 self.cursor.execute("UPDATE onlines SET "
                                     "online_pic_url = ? "
                                     "WHERE online_id = ?;",
-                                    (url if url != "" else self.default_group_image, online_id[0]))
+                                    (url if url != "" else self.default_online_image, online_id[0]))
                 self.cursor.execute("INSERT INTO online_platform ("
                                     "o_p_online_id, "
                                     "o_p_platform_id, "
@@ -1227,19 +1241,21 @@ class DatabaseSQLite:
                                     "u_o_online_id, "
                                     "u_o_role_id, "
                                     "u_o_date, "
-                                    "u_o_accepted"
+                                    "u_o_accepted, "
+                                    "u_o_ack"
                                     ") "
-                                    "VALUES (?,?,?,?,?)",
-                                    (owners[0], online_id[0], 1, datetime.utcnow(), True))
-                inviteds = [(user_invited, online_id[0], 2, datetime.utcnow(), False) for user_invited in invited]
+                                    "VALUES (?,?,?,?,?,?)",
+                                    (owners[0], online_id[0], 1, datetime.utcnow(), True, True))
+                inviteds = [(user_invited, online_id[0], 2, datetime.utcnow(), False, True) for user_invited in invited]
                 self.cursor.executemany("INSERT INTO user_online ("
                                         "u_o_user_id, "
                                         "u_o_online_id, "
                                         "u_o_role_id, "
                                         "u_o_date, "
-                                        "u_o_accepted"
+                                        "u_o_accepted, "
+                                        "u_o_ack"
                                         ") "
-                                        "VALUES (?,?,?,?,?)",
+                                        "VALUES (?,?,?,?,?,?)",
                                         (inviteds))
                 self.close_connection()
                 return {"id": online_id[0],
@@ -1359,7 +1375,7 @@ class DatabaseSQLite:
     def email_verification(self, user_id):
         self.open_connection()
         response = self.cursor.execute("UPDATE users "
-                                       "SET user_email_verified = true "
+                                       "SET user_email_verified = 1 "
                                        "WHERE user_id = ?;",
                                        (user_id,))
         self.close_connection()
@@ -1520,29 +1536,32 @@ class DatabaseSQLite:
                                     "u_g_group_id, "
                                     "u_g_role_id, "
                                     "u_g_accepted, "
-                                    "u_g_date "
+                                    "u_g_date, "
+                                    "u_g_ack"
                                     ") "
-                                    "VALUES (?,?,?,?,?)",
-                                    (owners[0], group_id[0], 1, True, datetime.utcnow()))
-                frontlines = [(user_frontline, group_id, 2, datetime.utcnow(), False) for user_frontline in frontline]
+                                    "VALUES (?,?,?,?,?,?)",
+                                    (owners[0], group_id[0], 1, True, datetime.utcnow(), True))
+                frontlines = [(user_frontline, group_id, 2, datetime.utcnow(), False, True) for user_frontline in frontline]
                 self.cursor.executemany("INSERT INTO user_group ("
                                         "u_g_user_id, "
                                         "u_g_group_id, "
                                         "u_g_role_id, "
                                         "u_g_date, "
-                                        "u_g_accepted"
+                                        "u_g_accepted, "
+                                        "u_g_ack"
                                         ") "
-                                        "VALUES (?,?,?,?,?)",
+                                        "VALUES (?,?,?,?,?,?)",
                                         (frontlines))
-                students_ = [(user_student, group_id, 3, datetime.utcnow(), False) for user_student in students]
+                students_ = [(user_student, group_id, 3, datetime.utcnow(), False, True) for user_student in students]
                 self.cursor.executemany("INSERT INTO user_group ("
                                         "u_g_user_id, "
                                         "u_g_group_id, "
                                         "u_g_role_id, "
                                         "u_g_date, "
-                                        "u_g_accepted"
+                                        "u_g_accepted "
+                                        "u_g_ack"
                                         ") "
-                                        "VALUES (?,?,?,?,?)",
+                                        "VALUES (?,?,?,?,?,?)",
                                         (students_))
                 self.close_connection()
                 return {"id": group_id[0],
@@ -1627,10 +1646,11 @@ class DatabaseSQLite:
         response = self.cursor.execute("INSERT INTO user_follows_user ("
                                        "u_f_u_user_id, "
                                        "u_f_u_followed_id, "
-                                       "u_f_u_date "
+                                       "u_f_u_date, "
+                                       "u_f_u_ack "
                                        ")"
-                                       "VALUES (?,?,?);",
-                                       (my_id, user_id, datetime.utcnow()))
+                                       "VALUES (?,?,?,?);",
+                                       (my_id, user_id, datetime.utcnow(), False))
         self.close_connection()
         return {'ok': True if response.rowcount > 0 else False}
 
@@ -1652,10 +1672,11 @@ class DatabaseSQLite:
                                        "u_g_group_id, "
                                        "u_g_role_id, "
                                        "u_g_date, "
-                                       "u_g_accepted"
+                                       "u_g_accepted, "
+                                       "u_g_ack"
                                        ")"
-                                       "VALUES (?,?,?,?,?);",
-                                       (user_id, group_id, role_id, datetime.utcnow(), True))
+                                       "VALUES (?,?,?,?,?,?);",
+                                       (user_id, group_id, role_id, datetime.utcnow(), True, False))
         if response.rowcount > 0:
             self.cursor.execute("UPDATE groups SET "
                                 "group_verified = 1 "
@@ -2195,24 +2216,201 @@ class DatabaseSQLite:
     # APPoeira Function: News list. Called when /news invoked
     def news(self, user_id):
         self.open_connection()
-        self.cursor.execute("select u_g_user_id, 2 "
+        self.cursor.execute("select u_g_group_id, "
+                            "u_g_date, 2, "
+                            "group_name "
                             "from user_group "
+                            "inner join groups on u_g_group_id = group_id "
                             "where u_g_user_id = ? and u_g_accepted = 0 "
                             "UNION ALL "
-                            "select u_r_user_id, 3 "
+                            "select u_r_roda_id, "
+                            "u_r_date, 3, "
+                            "roda_name "
                             "from user_roda "
+                            "inner join rodas on u_r_roda_id = roda_id "
                             "where u_r_user_id = ? and u_r_accepted = 0 "
                             "UNION ALL "
-                            "select u_e_user_id, 4 "
+                            "select u_e_event_id, "
+                            "u_e_date, 4, "
+                            "event_name "
                             "from user_event "
+                            "inner join events on u_e_event_id = event_id "
                             "where u_e_user_id = ? and u_e_accepted = 0 "
                             "UNION ALL "
-                            "select u_o_user_id, 5 "
+                            "select u_o_online_id, "
+                            "u_o_date, 5, "
+                            "online_name "
                             "from user_online "
+                            "inner join onlines on u_o_online_id = online_id "
                             "where u_o_user_id = ? and u_o_accepted = 0",
                             (user_id, user_id, user_id, user_id,))
         result = self.cursor.fetchall()
-        return {'response': result != []}
+        response = [{'originId': news[0],
+                     'originName': news[3],
+                     'originType': news[2],
+                     'mediumId': None,
+                     'mediumName': None,
+                     'mediumType': None,
+                     'destinationId': None,
+                     'destinationName': None,
+                     'destinationType': None,
+                     'newsType': 1,
+                     'newsDate': news[1].split(" ")[0]
+                     } for news in result] if result else {'originId': None,
+                                                           'originName': None,
+                                                           'originType': None,
+                                                           'mediumId': None,
+                                                           'mediumName': None,
+                                                           'mediumType': None,
+                                                           'destinationId': None,
+                                                           'destinationName': None,
+                                                           'destinationType': None,
+                                                           'newsType': None,
+                                                           'newsDate': None
+                                                           }
+        self.cursor.execute("SELECT u_f_u_user_id, "
+                            "u_f_u_date, "
+                            "user_apelhido "
+                            "from user_follows_user "
+                            "inner join users on u_f_u_user_id = user_id "
+                            "where u_f_u_followed_id = ? and u_f_u_ack = 0 ",
+                            (user_id,))
+        result = self.cursor.fetchall()
+        response.append([{'originId': news[0],
+                          'originName': news[2],
+                          'originType': 1,
+                          'mediumId': None,
+                          'mediumName': None,
+                          'mediumType': None,
+                          'destinationId': None,
+                          'destinationName': None,
+                          'destinationType': None,
+                          'newsType': 2,
+                          'newsDate': news[1].split(" ")[0]
+                          } for news in result] if result else {'originId': None,
+                                                                'originName': None,
+                                                                'originType': None,
+                                                                'mediumId': None,
+                                                                'mediumName': None,
+                                                                'mediumType': None,
+                                                                'destinationId': None,
+                                                                'destinationName': None,
+                                                                'destinationType': None,
+                                                                'newsType': None,
+                                                                'newsDate': None
+                                                                })
+        if result:
+            data = [(res[0], user_id) for res in result]
+            self.cursor.executemany("UPDATE user_follows_user SET "
+                                    "u_f_u_ack = 1 "
+                                    "WHERE u_f_u_ack = 0 "
+                                    "AND u_f_u_user_id = ? "
+                                    "AND u_f_u_followed_id = ?;",
+                                    (data))
+        self.cursor.execute("select u_r_roda_id, 3, "
+                            "roda_name, "
+                            "roda_date "
+                            "from user_roda "
+                            "inner join rodas on u_r_roda_id = roda_id "
+                            "where u_r_user_id = ? "
+                            "UNION ALL "
+                            "select u_e_event_id, 4, "
+                            "event_name, "
+                            "event_date "
+                            "from user_event "
+                            "inner join events on u_e_event_id = event_id "
+                            "where u_e_user_id = ? "
+                            "UNION ALL "
+                            "select u_o_online_id, 5, "
+                            "online_name, "
+                            "online_date "
+                            "from user_online "
+                            "inner join onlines on u_o_online_id = online_id "
+                            "where u_o_user_id = ? ",
+                            (user_id, user_id, user_id,))
+        result = self.cursor.fetchall()
+        response.append([{'originId': news[0],
+                          'originName': news[1],
+                          'originType': news[2],
+                          'mediumId': None,
+                          'mediumName': None,
+                          'mediumType': None,
+                          'destinationId': None,
+                          'destinationnName': None,
+                          'destinationType': None,
+                          'newsType': 3,
+                          'newsDate': news[3].split(" ")[0]
+                          } for news in result] if result else {'originId': None,
+                                                                'originName': None,
+                                                                'originType': None,
+                                                                'mediumId': None,
+                                                                'mediumName': None,
+                                                                'mediumType': None,
+                                                                'destinationId': None,
+                                                                'destinationName': None,
+                                                                'destinationType': None,
+                                                                'newsType': None,
+                                                                'newsDate': None
+                                                                })
+        # TODO problema porque me coge mi id y no los de los integrantes del grupo
+        self.cursor.execute("select u_g_group_id, 2, "
+                            "u_g_date, "
+                            "u_g_user_id, "
+                            "group_name "
+                            "from user_group "
+                            "inner join groups on u_g_group_id = group_id "
+                            "where u_g_user_id = ? and u_g_ack = 0 and u_g_role_id = 1 "
+                            "UNION ALL "
+                            "select u_r_roda_id, 3, "
+                            "u_r_date, "
+                            "u_r_user_id, "
+                            "roda_name "
+                            "from user_roda "
+                            "inner join rodas on u_r_roda_id = roda_id "
+                            "where u_r_user_id = ? and u_r_ack = 0 and u_r_role_id = 1 "
+                            "UNION ALL "
+                            "select u_e_event_id, 4, "
+                            "u_e_date, "
+                            "u_e_user_id, "
+                            "event_name "
+                            "from user_event "
+                            "inner join events on u_e_event_id = event_id "
+                            "where u_e_user_id = ? and u_e_ack = 0 and u_e_role_id = 1 "
+                            "UNION ALL "
+                            "select u_o_online_id, 5, "
+                            "u_o_date, "
+                            "u_o_user_id, "
+                            "online_name "
+                            "from user_online "
+                            "inner join onlines on u_o_online_id = online_id "
+                            "where u_o_user_id = ? and u_o_ack = 0 and u_o_role_id = 1",
+                            (user_id, user_id, user_id, user_id,))
+        result = self.cursor.fetchall()
+        response.append([{'originId': news[0],
+                          'originName': news[3],
+                          'originType': news[1],
+                          'mediumId': None,
+                          'mediumName': None,
+                          'mediumType': None,
+                          'destinationId': None,
+                          'destinationnName': None,
+                          'destinationType': None,
+                          'newsType': 4,
+                          'newsDate': news[2].split(" ")[0]
+                          } for news in result] if result else {'originId': None,
+                                                                'originName': None,
+                                                                'originType': None,
+                                                                'mediumId': None,
+                                                                'mediumName': None,
+                                                                'mediumType': None,
+                                                                'destinationId': None,
+                                                                'destinationName': None,
+                                                                'destinationType': None,
+                                                                'newsType': None,
+                                                                'newsDate': None
+                                                                })
+        self.close_connection()
+        return response
 
     # APPoeira Function: Search on the database. Called when /search invoked
     def search(self, search, mode):
@@ -2443,7 +2641,7 @@ class DatabaseSQLite:
                 self.cursor.execute("UPDATE users SET "
                                     "user_pic_url = ? "
                                     "WHERE user_id = ?;",
-                                    (url if url != "" else self.default_group_image, user_id))
+                                    (url if url != "" else self.default_user_image, user_id))
                 if crypt.hexdigest() == user[4]:
                     crypt = hashlib.new('sha256')
                     crypt.update(new_password.encode())
@@ -2630,10 +2828,11 @@ class DatabaseSQLite:
                                        "u_r_roda_id, "
                                        "u_r_role_id, "
                                        "u_r_date, "
-                                       "u_r_accepted"
+                                       "u_r_accepted, "
+                                       "u_t_ack"
                                        ")"
-                                       "VALUES (?,?,?,?,?);",
-                                       (user_id, roda_id, role_id, datetime.utcnow(), True))
+                                       "VALUES (?,?,?,?,?,?);",
+                                       (user_id, roda_id, role_id, datetime.utcnow(), True, False))
         if response.rowcount > 0:
             self.cursor.execute("UPDATE rodas SET "
                                 "roda_verified = 1 "
@@ -2764,10 +2963,11 @@ class DatabaseSQLite:
                                        "u_e_event_id, "
                                        "u_e_role_id, "
                                        "u_e_date, "
-                                       "u_e_accepted"
+                                       "u_e_accepted, "
+                                       "u_e_ack"
                                        ")"
-                                       "VALUES (?,?,?,?,?);",
-                                       (user_id, event_id, role_id, datetime.utcnow(), True))
+                                       "VALUES (?,?,?,?,?,?);",
+                                       (user_id, event_id, role_id, datetime.utcnow(), True, False))
         if response.rowcount > 0:
             self.cursor.execute("UPDATE events SET "
                                 "event_verified = 1 "
@@ -3048,10 +3248,11 @@ class DatabaseSQLite:
                                        "u_o_online_id, "
                                        "u_o_role_id, "
                                        "u_o_date, "
-                                       "u_o_accepted"
+                                       "u_o_accepted, "
+                                       "u_o_ack"
                                        ")"
-                                       "VALUES (?,?,?,?,?);",
-                                       (user_id, online_id, role_id, datetime.utcnow(), True))
+                                       "VALUES (?,?,?,?,?,?);",
+                                       (user_id, online_id, role_id, datetime.utcnow(), True, False))
         if response.rowcount > 0:
             self.cursor.execute("UPDATE onlines SET "
                                 "online_verified = 1 "

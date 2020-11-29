@@ -52,7 +52,7 @@ class Interceptor:
 class Elephant:
     def __init__(self):
         # APP constants
-        self.APP_ROUTE = 'https://234bf21550ef.ngrok.io'
+        self.APP_ROUTE = 'https://7394e12b510b.ngrok.io'
         # Mail Constants
         self.ADMIN_MAIL = 'appoeira.onethousandprojects@gmail.com'
         # Snoopy constants
@@ -63,8 +63,11 @@ class Elephant:
         # DB constants
         self.DB_PATH = "./DB/database.db"
         self.RELATION_DISTANCE = 0.009009009
-        self.DEFAULT_GROUP_IMAGE = 'https://image.flaticon.com/icons/png/512/33/33887.png'
-        self.DEFAULT_USER_IMAGE = 'https://image.flaticon.com/icons/png/512/928/928642.png'
+        self.DEFAULT_GROUP_IMAGE = 'https://appoeira.s3.eu-west-2.amazonaws.com/group_avatar_default.jpg'
+        self.DEFAULT_RODA_IMAGE = 'https://appoeira.s3.eu-west-2.amazonaws.com/event_avatar_default.jpg'
+        self.DEFAULT_EVENT_IMAGE = 'https://appoeira.s3.eu-west-2.amazonaws.com/event_avatar_default.jpg'
+        self.DEFAULT_ONLINE_IMAGE = 'https://appoeira.s3.eu-west-2.amazonaws.com/event_avatar_default.jpg'
+        self.DEFAULT_USER_IMAGE = 'https://appoeira.s3.eu-west-2.amazonaws.com/user_avatar_default.jpg'
         # AWS configuration
         self.AWS_GENERAL_KEY_ID = 'AKIAJFUZL44WQT476OTQ'
         self.AWS_GENERAL_KEY_SECRET = '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'

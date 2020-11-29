@@ -904,6 +904,7 @@ def news():
     elif interceptor.check_for_token(request.__getattr__('json'), librarian) == 3:
         return make_response(json.dumps({'error': "Invalid Token"}), 200)
 
+
 @app.route('/email-verification')
 def email_verification():
     try:
@@ -942,6 +943,6 @@ if __name__ == "__main__":
     # Awaking the Sailor
     sailor = Methods.Sailor()
     # Awaking the Librarian
-    librarian = DatabaseSQLite(elephant.DB_PATH, elephant.RELATION_DISTANCE, elephant.DEFAULT_GROUP_IMAGE, elephant.DEFAULT_USER_IMAGE, sailor)
+    librarian = DatabaseSQLite(elephant.DB_PATH, elephant.RELATION_DISTANCE, elephant.DEFAULT_GROUP_IMAGE, elephant.DEFAULT_RODA_IMAGE, elephant.DEFAULT_EVENT_IMAGE, elephant.DEFAULT_ONLINE_IMAGE, elephant.DEFAULT_USER_IMAGE, sailor)
     # Calling the server
     app.run(port=5000, debug=False)
